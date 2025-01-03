@@ -16,7 +16,8 @@ do
   GPU_ID=$((i % 8))
   echo Running worker $i on $GPU_ID
   # CUDA_VISIBLE_DEVICES=$GPU_ID WORKER_ID=$i N_WORKERS=$N_WORKERS python train.py &
-  CUDA_VISIBLE_DEVICES=$GPU_ID WORKER_ID=$i N_WORKERS=$N_WORKERS python fractal.py &
+  # CUDA_VISIBLE_DEVICES=$GPU_ID WORKER_ID=$i N_WORKERS=$N_WORKERS python fractal.py &
+  CUDA_VISIBLE_DEVICES=$GPU_ID WORKER_ID=$i N_WORKERS=$N_WORKERS python research/fractal.py &
 done
 
 wait

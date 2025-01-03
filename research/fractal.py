@@ -170,8 +170,6 @@ def train(
                     Al = torch.stack(Al).detach().cpu().numpy()
                     metric["Als"] = Al
 
-            print(metric)
-
             # TESTING
             alpha_l = Al[:, 1].tolist()
             omega_l = Al[:, 2].tolist()
@@ -179,8 +177,6 @@ def train(
             lrs = scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
             metric["lrs"] = lrs
             # TESTING
-
-            print(metric)
 
             logger.log(metric)
 

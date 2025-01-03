@@ -1,0 +1,7 @@
+{
+    "dataset_size": 4288,
+    "batch_size": 4288,
+    "width": 2,
+    "resample": false,
+    "signal_strength": 0.2
+}
