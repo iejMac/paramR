@@ -1,0 +1,2 @@
+# paramR
+parametrization research
