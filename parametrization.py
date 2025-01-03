@@ -142,3 +142,10 @@ def maximal_lr_scheduler(optimizer, n, al, bl, lr_prefactor=0.1):
             param_group['lr'] = lr_prefactor * lr_scale
         return [param_group['lr'] for param_group in optimizer.param_groups]
     return _lr_adjuster    
+
+def constant_lr_scheduler(optimizer):
+    # just for logging
+    def _lr_adjuster(alpha_l, u_l, omega_l):
+        # just grab lrs from param groups
+        return [param_group['lr'] for param_group in optimizer.param_groups]
+    return _lr_adjuster

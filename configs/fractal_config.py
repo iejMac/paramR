@@ -158,11 +158,12 @@ def mup_a3b3_eps_grid():
 def mup_a3b3_loss_grid():
     sp_resolution = 4
 
-    a3_grid = np.linspace(0.3, 0.7, num=sp_resolution).tolist()
-    b3_grid = np.linspace(0.3, 0.7, num=sp_resolution).tolist()
-    # a3_grid = [0.5]
-    # b3_grid = [0.5]
-    lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2]
+    # a3_grid = np.linspace(0.3, 0.7, num=sp_resolution).tolist()
+    # b3_grid = np.linspace(0.3, 0.7, num=sp_resolution).tolist()
+    a3_grid = [0.5]
+    b3_grid = [0.5]
+    # lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2]
+    lr_grid = [1e-2]
 
     for a3_id, a3 in enumerate(a3_grid):
         for b3_id, b3 in enumerate(b3_grid):

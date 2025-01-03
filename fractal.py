@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
-from parametrization import maximal_lr_scheduler
+from parametrization import maximal_lr_scheduler, constant_lr_scheduler
 
 torch.set_default_dtype(torch.float64)
 
@@ -52,6 +52,7 @@ def train(
 
     param_cfg = parametrization_config()
     scheduler = maximal_lr_scheduler(opt, n=width, al=param_cfg['al'], bl=param_cfg['bl'], lr_prefactor=opt_cfg['lr'])
+    # scheduler = constant_lr_scheduler(opt)
 
     train_loader = data_config().build(device=device)
 
@@ -59,6 +60,7 @@ def train(
         "losses": (1,),
         "rLs": (1,),
         "Als": (model.n_layers, 4),  # A_cum, A_alpha, A_omega, A_u
+        "lrs": (model.n_layers,)
     }
     logger = BinaryLogger(run_dir, n_steps=n_train_steps, metrics=metrics)
 
@@ -142,6 +144,7 @@ def train(
                             # o = z @ dw.T
                             o = z_init @ dw.T
                             o_n = rms_norm(o)
+                            # NOTE: mistake in the paper implies commented out line when in fact it should be uncommented
                             # A_alpha = (torch.log(o_n) - torch.log(z_n * dw_n)) / torch.log(torch.tensor(width))
                             A_alpha = (torch.log(o_n) - torch.log(z_init_n * dw_n)) / torch.log(torch.tensor(width))
                             if l_id > 0:  # by definition z = x therefore dz = 0
@@ -149,6 +152,7 @@ def train(
                                 # o = dz @ w.T
                                 o = dz @ w_init.T
                                 o_n = rms_norm(o)
+                                # NOTE: mistake in the paper implies commented out line when in fact it should be uncommented
                                 # A_omega = (torch.log(o_n) - torch.log(dz_n * w_n)) / torch.log(torch.tensor(width))
                                 A_omega = (torch.log(o_n) - torch.log(dz_n * w_init_n)) / torch.log(torch.tensor(width))
                                 # IV. u alignment
@@ -166,14 +170,19 @@ def train(
                     Al = torch.stack(Al).detach().cpu().numpy()
                     metric["Als"] = Al
 
-            logger.log(metric)
+            print(metric)
 
             # TESTING
             alpha_l = Al[:, 1].tolist()
             omega_l = Al[:, 2].tolist()
             u_l = Al[:, 3].tolist()
             lrs = scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
+            metric["lrs"] = lrs
             # TESTING
+
+            print(metric)
+
+            logger.log(metric)
 
         loss.backward()
 
@@ -184,8 +193,8 @@ def train(
     logger.save()
 
 def main(run_name, training_config, model_config, optimizer_config, parametrization_config, data_config):
-    run_dir = os.path.join("/home/maciej/code/salmon/workloads/cifar-10/runs/runs_max_sched", run_name)
-    # run_dir = os.path.join("/home/maciej/code/salmon/workloads/cifar-10/runs/runs_no_sched", run_name)
+    run_dir = os.path.join("/home/maciej/code/paramR/runs/runs_max_sched", run_name)
+    # run_dir = os.path.join("/home/maciej/code/paramR/runs/runs_no_sched", run_name)
     os.makedirs(run_dir, exist_ok=True)
     configs = {
         "training": training_config,
