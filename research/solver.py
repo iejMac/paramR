@@ -40,39 +40,12 @@ def min_lp(lp, *args, M):
     return X
 
 
-# https://or.stackexchange.com/a/712
-@static_vars(var_id=0)
-def max2_lp(lp, a, b, M):
-    X = plp.LpVariable(f'max2_X_{max2_lp.var_id}')
-    y = plp.LpVariable(f'max2_y_{max2_lp.var_id}', cat=plp.LpBinary)
-    max2_lp.var_id += 1
-
-    lp += a - b <= M * y
-    lp += b - a <= M * (1 - y)
-    lp += X >= a
-    lp += X >= b
-    lp += X <= a + M * (1 - y)
-    lp += X <= b + M * y
-
-    return X
-
-
-def max_lp(lp, *args, M):
-    if len(args) == 1:
-        return args[0]
-
-    X = max2_lp(lp, args[0], args[1], M)
-
-    for a in args[2:]:
-        X = max2_lp(lp, X, a, M)
-
-    return X
-
-
-def find_c_adam(a, b, alpha, u, omega, M=10):
-    solver = plp.PULP_CBC_CMD(msg=False)
+def find_c_adam(a, b, alpha, u, omega, solver=None, fl=False, M=10):
     assert len(a) == len(b) == len(alpha) == len(u) == len(omega)
     n = len(a)
+
+    if solver is None:
+        solver = plp.PULP_CBC_CMD(msg=False)
 
     lp = plp.LpProblem('min_c', plp.LpMinimize)
     c = plp.LpVariable.dicts('c', range(n))
@@ -112,8 +85,9 @@ def find_c_adam(a, b, alpha, u, omega, M=10):
     lp += r[n - 1] == min_lp(lp, x1, x2, x3, M=M)
     lp += r[n - 1] >= 0
 
-    # feature learning
-    # lp += r[n - 2] == 0
+    if fl:
+        # feature learning
+        lp += r[n - 2] == 0
 
     lp += plp.lpSum(c)
     lp.solve(solver)
@@ -124,10 +98,12 @@ def find_c_adam(a, b, alpha, u, omega, M=10):
     return [lp.c[i].varValue for i in range(n)], [lp.r[i].varValue for i in range(n)]
 
 
-def find_c_sgd(a, b, alpha, u, omega, M=10):
-    solver = plp.PULP_CBC_CMD(msg=False)
+def find_c_sgd(a, b, alpha, u, omega, solver=None, fl=False, M=10):
     assert len(a) == len(b) == len(alpha) == len(u) == len(omega)
     n = len(a)
+
+    if solver is None:
+        solver = plp.PULP_CBC_CMD(msg=False)
 
     lp = plp.LpProblem('min_c', plp.LpMinimize)
     c = plp.LpVariable.dicts('c', range(n))
@@ -147,8 +123,6 @@ def find_c_sgd(a, b, alpha, u, omega, M=10):
     lp += r[0] >= 0
 
     for i in range(n - 1):
-        # NOTE: gradient scale (potential) mistake
-        # lp += g[i] == max_lp(lp, a[n - 1] + b[n - 1], 2 * a[n - 1] + c[n - 1], M=M) + a[i]
         lp += g[i] == min_lp(lp, a[n - 1] + b[n - 1], 2 * a[n - 1] + c[n - 1], M=M) + a[i]
 
     for i in range(1, n - 1):
@@ -173,8 +147,9 @@ def find_c_sgd(a, b, alpha, u, omega, M=10):
     lp += r[n - 1] == min_lp(lp, x1, x2, x3, M=M)
     lp += r[n - 1] >= 0
 
-    # feature learning
-    # lp += r[n - 2] == 0
+    if fl:
+        # feature learning
+        lp += r[n - 2] == 0
 
     lp += plp.lpSum(c)
     lp.solve(solver)

@@ -1,12 +1,13 @@
-import os
 import copy
 import json
+import os
 import time
+
+import numpy as np
 import torch
 import torch.nn.functional as F
-import numpy as np
 
-from parametrization import maximal_lr_scheduler, constant_lr_scheduler
+from parametrization import maximal_lr_scheduler
 
 torch.set_default_dtype(torch.float64)
 
@@ -212,14 +213,18 @@ def main(run_name, training_config, model_config, optimizer_config, parametrizat
         run_dir=run_dir,
     )
 
-from configs.fractal_config import jascha_grid, mup_a3b3_grid, mup_a3b3_eps_grid, mup_a3b3_loss_grid
+from configs.fractal_config import jascha_grid, ab_grid, ab_eps_grid, ab_lr_grid
 
 if __name__ == "__main__":
     worker_id = int(os.environ.get("WORKER_ID", 0))
     n_workers = int(os.environ.get("N_WORKERS", 1))
 
-    grid = mup_a3b3_loss_grid
-    for exp_id, run_name, param_args in grid():
+    param = os.environ.get("PARAM", "mup")
+    optim = os.environ.get("OPTIM", "adam")
+    align = os.environ.get("ALIGN", "full")
+    l = int(os.environ.get("L", 3))
+
+    for exp_id, run_name, param_args in ab_lr_grid(param=param, opt=optim, alignment=align, l=l):
         if exp_id % n_workers == worker_id:
             t0 = time.time()
             main(run_name, *param_args)

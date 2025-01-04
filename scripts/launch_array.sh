@@ -10,14 +10,16 @@ cleanup() {
 trap cleanup SIGINT
 
 N_WORKERS=$1
+PARAM=${2:-"mup"}
+OPTIM=${3:-"adam"}
+ALIGN=${4:-"full"}
+L=${5:-"3"}
 
 for ((i=0; i<N_WORKERS; i++))
 do
   GPU_ID=$((i % 8))
   echo Running worker $i on $GPU_ID
-  # CUDA_VISIBLE_DEVICES=$GPU_ID WORKER_ID=$i N_WORKERS=$N_WORKERS python train.py &
-  # CUDA_VISIBLE_DEVICES=$GPU_ID WORKER_ID=$i N_WORKERS=$N_WORKERS python fractal.py &
-  CUDA_VISIBLE_DEVICES=$GPU_ID WORKER_ID=$i N_WORKERS=$N_WORKERS python research/fractal.py &
+  CUDA_VISIBLE_DEVICES=$GPU_ID WORKER_ID=$i N_WORKERS=$N_WORKERS PARAM=$PARAM OPTIM=$OPTIM ALIGN=$ALIGN L=$L python research/fractal.py &
 done
 
 wait
