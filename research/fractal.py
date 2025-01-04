@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import sys
 import time
 
 import numpy as np
@@ -213,13 +214,14 @@ def main(run_name, training_config, model_config, optimizer_config, parametrizat
         run_dir=run_dir,
     )
 
-from configs.fractal_config import jascha_grid, mup_adam_a3b3_grid
 
 if __name__ == "__main__":
     worker_id = int(os.environ.get("WORKER_ID", 0))
     n_workers = int(os.environ.get("N_WORKERS", 1))
 
-    grid = mup_adam_a3b3_grid
+    import configs.fractal_config
+    grid = getattr(configs.fractal_config, sys.argv[1])
+
     for exp_id, run_name, param_args in grid():
         if exp_id % n_workers == worker_id:
             t0 = time.time()
