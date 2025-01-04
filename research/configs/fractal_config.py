@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 
 from .config import Config
@@ -158,7 +160,7 @@ def jascha_grid():
         for c2_id, c2 in enumerate(c2_grid):
             exp_id = c1_id * len(c2_grid) + c2_id
             def mean_field_parametrization_with_diff_cl():
-                mf_cfg = param_frac('mfp', 'sgd', 'full', 2)
+                mf_cfg = mfp_parametrization('sgd', 'full', 2)
                 mf_cfg['cl'] = [c1, c2]
                 return mf_cfg
 
@@ -197,30 +199,28 @@ def ab_data():
         }
     )
 
-def ab_grid(param, opt, alignment, l, n_layers=3, resolution=5, ab_range=0.2):
-    cfg = param_frac(param, opt, alignment, n_layers)
-    a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
-    b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
+def ab_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
+    a_grid = np.linspace(param_cfg['al'][l - 1] - ab_range, param_cfg['al'][l - 1] + ab_range, num=resolution).tolist()
+    b_grid = np.linspace(param_cfg['bl'][l - 1] - ab_range, param_cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
 
     for a_id, a in enumerate(a_grid):
         for b_id, b in enumerate(b_grid):
             exp_id = a_id * len(b_grid) + b_id
 
             def diff_ab():
-                cfg = param_frac(param, opt, alignment, n_layers)
+                cfg = deepcopy(param_cfg)
                 cfg['al'][l - 1] = a
                 cfg['bl'][l - 1] = b
                 return cfg
 
-            param_args = (training_frac, mlp2h, opt_frac(opt), diff_ab, ab_data)
+            param_args = (training_frac, mlp2h, opt_cfg, diff_ab, ab_data)
 
-            run_name = f"{param}_{opt}_{alignment}_a{l}_{a:.2f}_b{l}_{b:.2f}"
+            run_name = f"grid_a{l}_{a:.2f}_b{l}_{b:.2f}"
             yield exp_id, run_name, param_args
 
-def ab_eps_grid(param, opt, alignment, l, n_layers=3, resolution=5, t_resolution=11, ab_range=0.2):
-    cfg = param_frac(param, opt, alignment, n_layers)
-    a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
-    b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
+def ab_eps_grid(param_cfg, opt_cfg, l, resolution=5, t_resolution=11, ab_range=0.2):
+    a_grid = np.linspace(param_cfg['al'][l - 1] - ab_range, param_cfg['al'][l - 1] + ab_range, num=resolution).tolist()
+    b_grid = np.linspace(param_cfg['bl'][l - 1] - ab_range, param_cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
     eps_grid = np.linspace(0.0, 1.0, num=t_resolution).tolist()
 
     for a_id, a in enumerate(a_grid):
@@ -229,7 +229,7 @@ def ab_eps_grid(param, opt, alignment, l, n_layers=3, resolution=5, t_resolution
                 exp_id = (a_id * len(b_grid) + b_id) * len(eps_grid) + eps_id
 
                 def diff_ab(a=a, b=b):
-                    cfg = param_frac(param, opt, alignment, n_layers)
+                    cfg = deepcopy(param_cfg)
                     cfg['al'][l - 1] = a
                     cfg['bl'][l - 1] = b
                     return cfg
@@ -239,14 +239,13 @@ def ab_eps_grid(param, opt, alignment, l, n_layers=3, resolution=5, t_resolution
                     data_cfg["signal_strength"] = eps
                     return data_cfg
 
-                param_args = (training_frac, mlp2h, opt_frac(opt), diff_ab, ab_data_w_signal)
-                run_name = f"{param}_{opt}_{alignment}_a{l}_{a:.2f}_b{l}_{b:.2f}_eps_{eps:.2f}"
+                param_args = (training_frac, mlp2h, opt_cfg, diff_ab, ab_data_w_signal)
+                run_name = f"grid_a{l}_{a:.2f}_b{l}_{b:.2f}_eps_{eps:.2f}"
                 yield exp_id, run_name, param_args
 
-def ab_lr_grid(param, opt, alignment, l, n_layers=3, resolution=5, ab_range=0.2):
-    cfg = param_frac(param, opt, alignment, n_layers)
-    a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
-    b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
+def ab_lr_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
+    a_grid = np.linspace(param_cfg['al'][l - 1] - ab_range, param_cfg['al'][l - 1] + ab_range, num=resolution).tolist()
+    b_grid = np.linspace(param_cfg['bl'][l - 1] - ab_range, param_cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
     lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2]
 
     for a_id, a in enumerate(a_grid):
@@ -255,29 +254,27 @@ def ab_lr_grid(param, opt, alignment, l, n_layers=3, resolution=5, ab_range=0.2)
                 exp_id = (a_id * len(b_grid) + b_id) * len(lr_grid) + lr_id
 
                 def diff_ab(a=a, b=b):
-                    cfg = param_frac(param, opt, alignment, n_layers)
+                    cfg = deepcopy(param_cfg)
                     cfg['al'][l - 1] = a
                     cfg['bl'][l - 1] = b
                     return cfg
 
                 def opt_w_lr(lr=lr):
-                    opt_config = opt_frac(opt)
+                    opt_config = deepcopy(opt_cfg)
                     opt_config['lr'] = lr
                     return opt_config
 
                 param_args = (training_frac, mlp2h, opt_w_lr, diff_ab, ab_data)
-                run_name = f"{param}_{opt}_{alignment}_a{l}_{a:.2f}_b{l}_{b:.2f}_lr_{lr:.6f}"
+                run_name = f"grid_a{l}_{a:.2f}_b{l}_{b:.2f}_lr_{lr:.6f}"
                 yield exp_id, run_name, param_args
 
 def mup_adam_a3b3_grid():
     return Config(
         obj=ab_grid,
         params={
-            "param": 'mup',
-            "opt": 'adam',
-            "alignment": 'full',
+            "param_cfg": mup_parametrization("adam", "full", 3),
+            "opt_cfg": adamw_frac(),
             "l": 3,
-            "n_layers": 3,
             "resolution": 5,
             "ab_range": 0.2,
         },
@@ -312,24 +309,6 @@ def ada_frac():
             "lr": 5e-3,
         },
     )
-
-def param_frac(type, opt, alignment, n_layers):
-    if type == 'mup':
-        return mup_parametrization(opt, alignment, n_layers)
-    elif type == 'ntk':
-        return ntk_parametrization(opt, alignment, n_layers)
-    elif type == 'mfp':
-        return mfp_parametrization(opt, alignment, n_layers)
-    elif type == 'standard':
-        return standard_parametrization(opt, alignment, n_layers)
-
-def opt_frac(type):
-    if type == 'sgd':
-        return sgd_frac()
-    elif type == 'adam':
-        return adamw_frac()
-    elif type == 'ada':
-        return ada_frac()
 
 def training_frac():
     from fractal import train

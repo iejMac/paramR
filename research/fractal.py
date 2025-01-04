@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from parametrization import maximal_lr_scheduler
+from parametrization import maximal_lr_scheduler, constant_lr_scheduler
 
 torch.set_default_dtype(torch.float64)
 
@@ -52,8 +52,8 @@ def train(
     opt = opt_cfg.build(params=params)
 
     param_cfg = parametrization_config()
-    scheduler = maximal_lr_scheduler(opt, n=width, al=param_cfg['al'], bl=param_cfg['bl'], lr_prefactor=opt_cfg['lr'])
-    # scheduler = constant_lr_scheduler(opt)
+    # scheduler = maximal_lr_scheduler(opt, n=width, al=param_cfg['al'], bl=param_cfg['bl'], lr_prefactor=opt_cfg['lr'])
+    scheduler = constant_lr_scheduler(opt)
 
     train_loader = data_config().build(device=device)
 
