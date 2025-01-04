@@ -272,15 +272,12 @@ def ab_lr_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
                 yield exp_id, run_name, param_args
 
 def mup_adam_a3b3_grid():
-    return Config(
-        obj=ab_grid,
-        params={
-            "param_cfg": ft.partial(mup_parametrization, "adam", "full", 3),
-            "opt_cfg": adamw_frac,
-            "l": 3,
-            "resolution": 5,
-            "ab_range": 0.2,
-        },
+    return ab_grid(
+        param_cfg=ft.partial(mup_parametrization, "adam", "full", 3),
+        opt_cfg=adamw_frac,
+        l=3,
+        resolution=5,
+        ab_range=0.2
     )
 
 
