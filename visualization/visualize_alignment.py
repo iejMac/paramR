@@ -113,7 +113,6 @@ def create_single_plot(directories: List[str], output_path: str, signal_strength
         return
 
     # Create position mapping
-    # (This is optional in your code, but let's keep it for clarity.)
     pos_map = {(p1, p2): (i, j) for i, p1 in enumerate(param1_values) for j, p2 in enumerate(param2_values)}
 
     # Create figure with even dimensions
@@ -132,8 +131,7 @@ def create_single_plot(directories: List[str], output_path: str, signal_strength
         for j in range(M):
             ax = axes[i, j]
             ax.text(0.5, 0.5, 'No data', ha='center', va='center', transform=ax.transAxes, fontsize=8)
-            ax.set_xlabel(grid_parameters[0])
-            ax.set_ylabel(grid_parameters[1])
+            # CHANGED: We will set X/Y labels after we know we have data
             ax.grid(alpha=0.3)
 
     # Plot for each directory
@@ -154,8 +152,9 @@ def create_single_plot(directories: List[str], output_path: str, signal_strength
 
         als_path = os.path.join(dir_path, 'Als.npy')
         losses_path = os.path.join(dir_path, 'losses.npy')
+        steps_path = os.path.join(dir_path, 'steps.npy')  # ADDED: path for steps
 
-        # Attempt to load alignment_metrics
+        # Load alignment_metrics
         try:
             alignment_metrics = np.load(als_path)
         except FileNotFoundError:
@@ -167,7 +166,7 @@ def create_single_plot(directories: List[str], output_path: str, signal_strength
             ax.text(0.5, 0.5, 'Error loading Als.npy', ha='center', va='center', transform=ax.transAxes, fontsize=8)
             continue
 
-        # Attempt to load losses
+        # Load losses
         try:
             losses = np.load(losses_path)
         except FileNotFoundError:
@@ -179,16 +178,28 @@ def create_single_plot(directories: List[str], output_path: str, signal_strength
             ax.text(0.5, 0.5, 'Error loading losses.npy', ha='center', va='center', transform=ax.transAxes, fontsize=8)
             continue
 
-        # Now we have both alignment_metrics and losses
-        avg_last_20_losses = np.mean(losses[-20:])
+        # Optionally load steps. If not found, default to np.arange.
+        if os.path.exists(steps_path):
+            steps = np.load(steps_path)
+            # If shape mismatch, just skip or fallback:
+            if len(steps) != alignment_metrics.shape[0]:
+                print(f"Warning: mismatch in shape of steps and alignment_metrics in {dir_path}.")
+                steps = np.arange(alignment_metrics.shape[0])
+        else:
+            steps = np.arange(alignment_metrics.shape[0])
+
+        avg_last_20_losses = np.mean(losses[-20:]) if len(losses) >= 20 else np.mean(losses)
+
+        # alignment_metrics shape = (n_steps, n_layers, n_components)
         n_steps, n_layers, n_components = alignment_metrics.shape
 
-        # Create plots
+        # Create line plots with steps on the x-axis
         for layer in range(n_layers):
             used_layer_indices.add(layer)
             for comp_idx, comp_name in enumerate(COMPONENT_STYLES.keys()):
                 line_style = COMPONENT_STYLES[comp_name]
                 ax.plot(
+                    steps,  # CHANGED: use steps instead of just index
                     alignment_metrics[:, layer, comp_idx],
                     line_style,
                     color=LAYER_COLORS[layer % len(LAYER_COLORS)],
@@ -196,6 +207,8 @@ def create_single_plot(directories: List[str], output_path: str, signal_strength
                 )
 
         # Configure subplot
+        ax.set_xlabel("Training step")         # CHANGED
+        ax.set_ylabel("Alignment metric")      # CHANGED
         ax.set_ylim(bottom=0.0, top=1.0)
         ax.set_title(
             f'{grid_parameters[0]}={params[0]:.2f}, {grid_parameters[1]}={params[1]:.2f}\n'
@@ -299,7 +312,6 @@ def create_ffmpeg_script(output_dir: str, num_frames: int):
 
 if __name__ == "__main__":
     # Set this path as needed
-    # ROOT_DIR = '/home/maciej/code/salmon/workloads/cifar-10/runs/runs_no_sched'
-    ROOT_DIR = '/home/maciej/code/salmon/workloads/cifar-10/runs/runs_max_sched'
+    ROOT_DIR = '/home/maciej/code/paramR/runs/runs_no_sched'
     GRID_PARAMETERS = ['al.2', 'bl.2']  # Modify this list to specify different grid parameters
     save_frames(ROOT_DIR, GRID_PARAMETERS)

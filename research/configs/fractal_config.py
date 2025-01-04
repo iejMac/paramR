@@ -44,8 +44,10 @@ def jascha_data():
 
 def jascha_grid():
     resolution = 4
-    c1_grid = np.linspace(-1.5, -0.5, num=resolution).tolist()
-    c2_grid = np.linspace(-1.5, -0.5, num=resolution).tolist()
+    # c1_grid = np.linspace(-1.5, -0.5, num=resolution).tolist()
+    # c2_grid = np.linspace(-1.5, -0.5, num=resolution).tolist()
+    c1_grid = np.linspace(-1.5, 0.5, num=resolution).tolist()
+    c2_grid = np.linspace(-3.5, -1.5, num=resolution).tolist()
 
     for c1_id, c1 in enumerate(c1_grid):
         for c2_id, c2 in enumerate(c2_grid):
@@ -215,6 +217,6 @@ def training_frac():
         params={
             "seed": 0,
             "n_train_steps": N_STEPS,
-            "log_freq": 1,
+            "log_freq": 2,
         },
     )
