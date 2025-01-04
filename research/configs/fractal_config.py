@@ -16,7 +16,7 @@ def mlp1h():
     )
 N_FREE_PARAMS_1 = N_FRAC_1 * N_FRAC_1 + N_FRAC_1 * 1
 
-def mup_parametrization(opt='adam', alignment='full', n_layers=3):
+def mup_parametrization(opt, alignment, n_layers):
     from parametrization import abc_parametrization
 
     al = [-0.5] +  [0.0] * (n_layers - 2) +  [0.5]
@@ -46,7 +46,7 @@ def mup_parametrization(opt='adam', alignment='full', n_layers=3):
         }
     )
 
-def ntk_parametrization(opt='adam', alignment='full', n_layers=3):
+def ntk_parametrization(opt, alignment, n_layers):
     from parametrization import abc_parametrization
 
     al =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
@@ -76,7 +76,7 @@ def ntk_parametrization(opt='adam', alignment='full', n_layers=3):
         }
     )
 
-def mfp_parametrization(opt='adam', alignment='full', n_layers=3):
+def mfp_parametrization(opt, alignment, n_layers):
     from parametrization import abc_parametrization
 
     al =  [0.0] +  [0.5] * (n_layers - 2) +  [1.0]
@@ -106,7 +106,7 @@ def mfp_parametrization(opt='adam', alignment='full', n_layers=3):
         }
     )
 
-def standard_parametrization(opt='adam', alignment='full', n_layers=3):
+def standard_parametrization(opt, alignment, n_layers):
     from parametrization import abc_parametrization
 
     al =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
@@ -197,7 +197,7 @@ def ab_data():
         }
     )
 
-def ab_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, resolution=5, ab_range=0.2):
+def ab_grid(param, opt, alignment, l, n_layers=3, resolution=5, ab_range=0.2):
     cfg = param_frac(param, opt, alignment, n_layers)
     a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
     b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
@@ -217,7 +217,7 @@ def ab_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, resol
             run_name = f"{param}_{opt}_{alignment}_a{l}_{a:.2f}_b{l}_{b:.2f}"
             yield exp_id, run_name, param_args
 
-def ab_eps_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, resolution=5, t_resolution=11, ab_range=0.2):
+def ab_eps_grid(param, opt, alignment, l, n_layers=3, resolution=5, t_resolution=11, ab_range=0.2):
     cfg = param_frac(param, opt, alignment, n_layers)
     a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
     b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
@@ -243,7 +243,7 @@ def ab_eps_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, r
                 run_name = f"{param}_{opt}_{alignment}_a{l}_{a:.2f}_b{l}_{b:.2f}_eps_{eps:.2f}"
                 yield exp_id, run_name, param_args
 
-def ab_lr_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, resolution=5, ab_range=0.2):
+def ab_lr_grid(param, opt, alignment, l, n_layers=3, resolution=5, ab_range=0.2):
     cfg = param_frac(param, opt, alignment, n_layers)
     a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
     b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
@@ -276,8 +276,8 @@ def mup_adam_a3b3_grid():
             "param": 'mup',
             "opt": 'adam',
             "alignment": 'full',
-            "n_layers": 3,
             "l": 3,
+            "n_layers": 3,
             "resolution": 5,
             "ab_range": 0.2,
         },
