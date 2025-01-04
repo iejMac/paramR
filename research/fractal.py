@@ -220,7 +220,7 @@ if __name__ == "__main__":
     n_workers = int(os.environ.get("N_WORKERS", 1))
 
     grid = mup_adam_a3b3_grid
-    for exp_id, run_name, param_args in grid():
+    for exp_id, run_name, param_args in grid().build():
         if exp_id % n_workers == worker_id:
             t0 = time.time()
             main(run_name, *param_args)

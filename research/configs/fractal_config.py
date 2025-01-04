@@ -1,4 +1,4 @@
-from copy import deepcopy
+import functools as ft
 
 import numpy as np
 
@@ -200,15 +200,16 @@ def ab_data():
     )
 
 def ab_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
-    a_grid = np.linspace(param_cfg['al'][l - 1] - ab_range, param_cfg['al'][l - 1] + ab_range, num=resolution).tolist()
-    b_grid = np.linspace(param_cfg['bl'][l - 1] - ab_range, param_cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
+    cfg = param_cfg()
+    a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
+    b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
 
     for a_id, a in enumerate(a_grid):
         for b_id, b in enumerate(b_grid):
             exp_id = a_id * len(b_grid) + b_id
 
             def diff_ab():
-                cfg = deepcopy(param_cfg)
+                cfg = param_cfg()
                 cfg['al'][l - 1] = a
                 cfg['bl'][l - 1] = b
                 return cfg
@@ -219,8 +220,9 @@ def ab_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
             yield exp_id, run_name, param_args
 
 def ab_eps_grid(param_cfg, opt_cfg, l, resolution=5, t_resolution=11, ab_range=0.2):
-    a_grid = np.linspace(param_cfg['al'][l - 1] - ab_range, param_cfg['al'][l - 1] + ab_range, num=resolution).tolist()
-    b_grid = np.linspace(param_cfg['bl'][l - 1] - ab_range, param_cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
+    cfg = param_cfg()
+    a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
+    b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
     eps_grid = np.linspace(0.0, 1.0, num=t_resolution).tolist()
 
     for a_id, a in enumerate(a_grid):
@@ -229,7 +231,7 @@ def ab_eps_grid(param_cfg, opt_cfg, l, resolution=5, t_resolution=11, ab_range=0
                 exp_id = (a_id * len(b_grid) + b_id) * len(eps_grid) + eps_id
 
                 def diff_ab(a=a, b=b):
-                    cfg = deepcopy(param_cfg)
+                    cfg = param_cfg()
                     cfg['al'][l - 1] = a
                     cfg['bl'][l - 1] = b
                     return cfg
@@ -244,8 +246,9 @@ def ab_eps_grid(param_cfg, opt_cfg, l, resolution=5, t_resolution=11, ab_range=0
                 yield exp_id, run_name, param_args
 
 def ab_lr_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
-    a_grid = np.linspace(param_cfg['al'][l - 1] - ab_range, param_cfg['al'][l - 1] + ab_range, num=resolution).tolist()
-    b_grid = np.linspace(param_cfg['bl'][l - 1] - ab_range, param_cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
+    cfg = param_cfg()
+    a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
+    b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
     lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2]
 
     for a_id, a in enumerate(a_grid):
@@ -254,13 +257,13 @@ def ab_lr_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
                 exp_id = (a_id * len(b_grid) + b_id) * len(lr_grid) + lr_id
 
                 def diff_ab(a=a, b=b):
-                    cfg = deepcopy(param_cfg)
+                    cfg = param_cfg()
                     cfg['al'][l - 1] = a
                     cfg['bl'][l - 1] = b
                     return cfg
 
                 def opt_w_lr(lr=lr):
-                    opt_config = deepcopy(opt_cfg)
+                    opt_config = opt_cfg()
                     opt_config['lr'] = lr
                     return opt_config
 
@@ -272,8 +275,8 @@ def mup_adam_a3b3_grid():
     return Config(
         obj=ab_grid,
         params={
-            "param_cfg": mup_parametrization("adam", "full", 3),
-            "opt_cfg": adamw_frac(),
+            "param_cfg": ft.partial(mup_parametrization, "adam", "full", 3),
+            "opt_cfg": adamw_frac,
             "l": 3,
             "resolution": 5,
             "ab_range": 0.2,
