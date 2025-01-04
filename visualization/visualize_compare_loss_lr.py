@@ -9,7 +9,7 @@ from typing import List, Dict, Tuple, Optional
 ###############################################################################
 #                              CONFIGURATION
 ###############################################################################
-BASE_PATH = "/home/maciej/code/salmon/workloads/cifar-10/runs"
+BASE_PATH = "/home/maciej/code/paramR/runs"
 run_dirs = [
     os.path.join(BASE_PATH, d) 
     for d in os.listdir(BASE_PATH) 
@@ -82,6 +82,19 @@ def load_losses(subdir_path: str) -> Optional[np.ndarray]:
     except (FileNotFoundError, OSError, ValueError):
         return None
 
+# ADDED: A new function to load steps
+def load_steps(subdir_path: str) -> Optional[np.ndarray]:
+    """
+    Load 'steps.npy' if present. Return None otherwise.
+    """
+    steps_path = os.path.join(subdir_path, "steps.npy")
+    if not os.path.exists(steps_path):
+        return None
+    try:
+        return np.load(steps_path)
+    except (OSError, ValueError):
+        return None
+
 def score_losses(losses: np.ndarray, window: int = 20) -> float:
     """
     Return a 'score' for deciding which losses are "best."
@@ -99,20 +112,20 @@ def compute_best_data_for_run_dir(
     run_dir: str, 
     param1: str, 
     param2: str
-) -> Dict[Tuple[float, float], Tuple[float, np.ndarray]]:
+) -> Dict[Tuple[float, float], Tuple[float, np.ndarray, np.ndarray]]:
     """
     Go through all subdirectories in `run_dir`.
-    For each subdir with valid (p1_val, p2_val) and LR, load losses.
+    For each subdir with valid (p1_val, p2_val) and LR, load losses and steps.
     Among multiple LRs for the same (p1_val, p2_val), pick the best based on score.
 
     Returns a dict: 
-       { (p1_val, p2_val): (best_lr, best_losses_array) }
+       { (p1_val, p2_val): (best_lr, best_losses_array, best_steps_array) }
     """
     if not os.path.isdir(run_dir):
         return {}
 
-    # Collect all (lr, losses) for each (p1_val, p2_val) in this run
-    temp_dict = {}  # (p1_val, p2_val) -> list of (lr, losses)
+    # Collect all (lr, losses, steps) for each (p1_val, p2_val) in this run
+    temp_dict = {}  # (p1_val, p2_val) -> list of (lr, losses, steps)
     subdirs = [
         d for d in os.listdir(run_dir) 
         if os.path.isdir(os.path.join(run_dir, d))
@@ -131,27 +144,40 @@ def compute_best_data_for_run_dir(
         if losses is None:
             continue
 
+        # ADDED: Load steps (or fallback)
+        steps = load_steps(subdir_path)
+        if steps is None:
+            steps = np.arange(len(losses))  # fallback if no steps.npy found
+
+        # If there's a mismatch in length, adjust or skip
+        if len(steps) != len(losses):
+            min_len = min(len(steps), len(losses))
+            steps = steps[:min_len]
+            losses = losses[:min_len]
+
         key = (p1_val, p2_val)
         if key not in temp_dict:
             temp_dict[key] = []
-        temp_dict[key].append((lr, losses))
+        temp_dict[key].append((lr, losses, steps))
 
     # Now pick the best LR for each (p1_val, p2_val)
     best_dict = {}
     for key, list_of_lr_losses in temp_dict.items():
         best_lr = None
         best_losses = None
+        best_steps = None
         best_score = float("inf")
 
-        for (lr, losses_array) in list_of_lr_losses:
+        for (lr, losses_array, steps_array) in list_of_lr_losses:
             sc = score_losses(losses_array, window=20)
             if sc < best_score:
                 best_score = sc
                 best_lr = lr
                 best_losses = losses_array
+                best_steps = steps_array
         
-        if best_lr is not None and best_losses is not None:
-            best_dict[key] = (best_lr, best_losses)
+        if best_lr is not None and best_losses is not None and best_steps is not None:
+            best_dict[key] = (best_lr, best_losses, best_steps)
 
     return best_dict
 
@@ -162,25 +188,25 @@ def collect_data_across_runs(
     run_dirs: List[str],
     param1: str,
     param2: str
-) -> Dict[Tuple[float, float], List[Tuple[str, float, np.ndarray]]]:
+) -> Dict[Tuple[float, float], List[Tuple[str, float, np.ndarray, np.ndarray]]]:
     """
     For each run_dir in `run_dirs`, produce its best_dict, i.e.:
-        { (p1_val, p2_val): (best_lr, best_losses) }
+        { (p1_val, p2_val): (best_lr, best_losses, best_steps) }
 
     Then we combine them so that each (p1_val, p2_val) maps to 
-    a list of (run_label, best_lr, best_losses) from all runs that have data.
+    a list of (run_label, best_lr, best_losses, best_steps) from all runs that have data.
     """
     # Combined structure
-    combined_dict = {}  # (p1_val, p2_val) -> list of (run_label, best_lr, best_losses)
+    combined_dict = {}  # (p1_val, p2_val) -> list of (run_label, best_lr, best_losses, best_steps)
 
     for run_dir in run_dirs:
         run_label = os.path.basename(run_dir) or run_dir  # fallback if empty
         best_dict = compute_best_data_for_run_dir(run_dir, param1, param2)
 
-        for key, (lr, losses) in best_dict.items():
+        for key, (lr, losses, steps) in best_dict.items():
             if key not in combined_dict:
                 combined_dict[key] = []
-            combined_dict[key].append((run_label, lr, losses))
+            combined_dict[key].append((run_label, lr, losses, steps))
 
     return combined_dict
 
@@ -188,7 +214,7 @@ def collect_data_across_runs(
 #                          PLOTTING (OVERLAYED)
 ###############################################################################
 def plot_overlayed_losses_with_best_lr(
-    combined_dict: Dict[Tuple[float, float], List[Tuple[str, float, np.ndarray]]],
+    combined_dict: Dict[Tuple[float, float], List[Tuple[str, float, np.ndarray, np.ndarray]]],
     param1: str,
     param2: str,
     output_filename: str
@@ -249,18 +275,18 @@ def plot_overlayed_losses_with_best_lr(
         ax.clear()
 
         # We'll accumulate lines of text to add to the subplot's title
-        # e.g. "run1: LR=1e-3"
         best_lr_lines = []
 
         # Plot each run's best curve
-        for (run_label, best_lr, best_losses) in runs_list:
+        for (run_label, best_lr, best_losses, best_steps) in runs_list:
             # Assign color if not assigned yet
             if run_label not in run_label_to_color:
                 run_label_to_color[run_label] = color_cycle[next_color_idx % len(color_cycle)]
                 next_color_idx += 1
 
             c = run_label_to_color[run_label]
-            ax.plot(best_losses, color=c)
+            # CHANGED: Plot with best_steps on the x-axis
+            ax.plot(best_steps, best_losses, color=c)
             # Keep track of the LR in the title
             best_lr_lines.append(f"{run_label}: LR={best_lr:.2e}")
 

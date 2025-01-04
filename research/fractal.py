@@ -11,23 +11,56 @@ from parametrization import maximal_lr_scheduler, constant_lr_scheduler
 torch.set_default_dtype(torch.float64)
 
 class BinaryLogger:
-    def __init__(self, log_dir, n_steps, metrics):
+    def __init__(self, log_dir, max_logs, metrics):
+        """
+        Args:
+            log_dir  (str): Directory to save logs.
+            max_logs (int): Maximum number of logs we can store (e.g. n_steps//log_freq).
+            metrics (dict): e.g. {"losses": (1,), "rLs": (1,), ...}
+        """
         self.log_dir = log_dir
-        self.n_steps = n_steps
-
+        self.max_logs = max_logs
+        self.current_log_idx = 0  # how many entries we've written so far
+        
         self.metrics = {}
         for m_name, m_shape in metrics.items():
-            m_full_shape = (n_steps,) + m_shape
-            self.metrics[m_name] = np.zeros(m_full_shape, dtype=np.float64)
-   
+            # Allocate shape (max_logs, ...) and fill with NaN
+            m_full_shape = (max_logs,) + m_shape
+            self.metrics[m_name] = np.full(m_full_shape, np.nan, dtype=np.float64)
+        
+        # Also store steps
+        self.steps = np.full((max_logs,), np.nan, dtype=np.float64)
+
     def log(self, metric):
+        """
+        metric is a dict like:
+            {"step": s, "losses": float_val, "rLs": float_val, ...}
+        """
         step = metric.pop("step")
-        for m_name, m in metric.items():
-            self.metrics[m_name][step] = m
+        if self.current_log_idx >= self.max_logs:
+            # We could raise an error or just ignore. Let's raise.
+            raise ValueError("BinaryLogger has reached its allocated capacity!")
+        
+        # Store which 'training step' we are logging
+        self.steps[self.current_log_idx] = step
+
+        # Store all other metrics
+        for m_name, m_val in metric.items():
+            self.metrics[m_name][self.current_log_idx] = m_val
+
+        self.current_log_idx += 1
 
     def save(self):
+        """
+        Only save the portion [0:self.current_log_idx] that has actual data.
+        """
+        valid_slice = slice(0, self.current_log_idx)
         for m_name, m_dat in self.metrics.items():
-            np.save(os.path.join(self.log_dir, f"{m_name}.npy"), m_dat)
+            np.save(os.path.join(self.log_dir, f"{m_name}.npy"), m_dat[valid_slice])
+        
+        # Save the steps array as well
+        np.save(os.path.join(self.log_dir, "steps.npy"), self.steps[valid_slice])
+
 
 def train(
         model_config, optimizer_config, parametrization_config, data_config,
@@ -51,18 +84,22 @@ def train(
     opt = opt_cfg.build(params=params)
 
     param_cfg = parametrization_config()
-    scheduler = maximal_lr_scheduler(opt, n=width, al=param_cfg['al'], bl=param_cfg['bl'], lr_prefactor=opt_cfg['lr'])
-    # scheduler = constant_lr_scheduler(opt)
+    # scheduler = maximal_lr_scheduler(opt, n=width, al=param_cfg['al'], bl=param_cfg['bl'], lr_prefactor=opt_cfg['lr'])
+    scheduler = constant_lr_scheduler(opt)
 
     train_loader = data_config().build(device=device)
 
+    max_logs = (n_train_steps + log_freq - 1) // log_freq
     metrics = {
         "losses": (1,),
         "rLs": (1,),
-        "Als": (model.n_layers, 4),  # A_cum, A_alpha, A_omega, A_u
+        "Als": (model.n_layers, 4),
         "lrs": (model.n_layers,)
     }
-    logger = BinaryLogger(run_dir, n_steps=n_train_steps, metrics=metrics)
+    logger = BinaryLogger(run_dir, max_logs, metrics)
+    # logger = BinaryLogger(run_dir, n_steps=n_train_steps, metrics=metrics)
+
+
 
     log_sample_size = 32
     trace = {}
@@ -218,6 +255,8 @@ if __name__ == "__main__":
     worker_id = int(os.environ.get("WORKER_ID", 0))
     n_workers = int(os.environ.get("N_WORKERS", 1))
 
+    # grid = jascha_grid
+    # grid = mup_a3b3_eps_grid
     grid = mup_a3b3_loss_grid
     for exp_id, run_name, param_args in grid():
         if exp_id % n_workers == worker_id:
