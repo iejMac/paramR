@@ -16,77 +16,116 @@ def mlp1h():
     )
 N_FREE_PARAMS_1 = N_FRAC_1 * N_FRAC_1 + N_FRAC_1 * 1
 
-def parametrization(type, opt='adam', alignment='full', n_layers=3):
+def mup_parametrization(opt='adam', alignment='full', n_layers=3):
     from parametrization import abc_parametrization
 
-    if type == 'mup':
-        al = [-0.5] +  [0.0] * (n_layers - 2) +  [0.5]
-        bl =  [0.5] +  [0.5] * (n_layers - 2) +  [0.5]
-        if alignment == 'full':
-            if opt == 'sgd':
-                cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
-            elif opt == 'adam':
-                cl =  [0.5] +  [1.0] * (n_layers - 2) +  [0.5]
-            elif opt == 'ada':
-                cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.0]
-        elif alignment == 'no':
-            if opt == 'sgd':
-                cl =  [0.0] + [-0.5] * (n_layers - 2) +  [0.0]
-            elif opt == 'adam':
-                cl =  [0.5] +  [0.5] * (n_layers - 2) +  [0.0]
-            elif opt == 'ada':
-                cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
-    elif type == 'ntk':
-        al =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
-        bl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
-        if alignment == 'full':
-            if opt == 'sgd':
-                cl = [-0.5] + [-0.5] * (n_layers - 2) +  [0.0]
-            elif opt == 'adam':
-                cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
-            elif opt == 'ada':
-                cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
-        elif alignment == 'no':
-            if opt == 'sgd':
-                cl = [-0.5] + [-1.0] * (n_layers - 2) + [-0.5]
-            elif opt == 'adam':
-                cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
-            elif opt == 'ada':
-                cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
-    elif type == 'mfp':
-        al =  [0.0] +  [0.5] * (n_layers - 2) +  [1.0]
-        bl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
-        if alignment == 'full':
-            if opt == 'sgd':
-                cl = [-1.0] + [-1.0] * (n_layers - 2) + [-1.0]
-            elif opt == 'adam':
-                cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.0]
-            elif opt == 'ada':
-                cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.0]
-        elif alignment == 'no':
-            if opt == 'sgd':
-                cl = [-1.0] + [-1.5] * (n_layers - 2) + [-1.0]
-            elif opt == 'adam':
-                cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.5]
-            elif opt == 'ada':
-                cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
-    elif type == 'standard':
-        al =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
-        bl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
-        if alignment == 'full':
-            if opt == 'sgd':
-                cl = [-0.5] +  [0.5] * (n_layers - 2) +  [1.0]
-            elif opt == 'adam':
-                cl =  [0.0] +  [1.0] * (n_layers - 2) +  [1.0]
-            elif opt == 'ada':
-                cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
-        elif alignment == 'no':
-            if opt == 'sgd':
-                cl = [-0.5] +  [0.0] * (n_layers - 2) +  [0.5]
-            elif opt == 'adam':
-                cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
-            elif opt == 'ada':
-                cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+    al = [-0.5] +  [0.0] * (n_layers - 2) +  [0.5]
+    bl =  [0.5] +  [0.5] * (n_layers - 2) +  [0.5]
+
+    if alignment == 'full':
+        if opt == 'sgd':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+        elif opt == 'adam':
+            cl =  [0.5] +  [1.0] * (n_layers - 2) +  [0.5]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.0]
+    elif alignment == 'no':
+        if opt == 'sgd':
+            cl =  [0.0] + [-0.5] * (n_layers - 2) +  [0.0]
+        elif opt == 'adam':
+            cl =  [0.5] +  [0.5] * (n_layers - 2) +  [0.0]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    return Config(
+        obj=abc_parametrization,
+        params={
+            "al": al,
+            "bl": bl,
+            "cl": cl,
+        }
+    )
+
+def ntk_parametrization(opt='adam', alignment='full', n_layers=3):
+    from parametrization import abc_parametrization
+
+    al =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+    bl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    if alignment == 'full':
+        if opt == 'sgd':
+            cl = [-0.5] + [-0.5] * (n_layers - 2) +  [0.0]
+        elif opt == 'adam':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+    elif alignment == 'no':
+        if opt == 'sgd':
+            cl = [-0.5] + [-1.0] * (n_layers - 2) + [-0.5]
+        elif opt == 'adam':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    return Config(
+        obj=abc_parametrization,
+        params={
+            "al": al,
+            "bl": bl,
+            "cl": cl,
+        }
+    )
+
+def mfp_parametrization(opt='adam', alignment='full', n_layers=3):
+    from parametrization import abc_parametrization
+
+    al =  [0.0] +  [0.5] * (n_layers - 2) +  [1.0]
+    bl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    if alignment == 'full':
+        if opt == 'sgd':
+            cl = [-1.0] + [-1.0] * (n_layers - 2) + [-1.0]
+        elif opt == 'adam':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.0]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.0]
+    elif alignment == 'no':
+        if opt == 'sgd':
+            cl = [-1.0] + [-1.5] * (n_layers - 2) + [-1.0]
+        elif opt == 'adam':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.5]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    return Config(
+        obj=abc_parametrization,
+        params={
+            "al": al,
+            "bl": bl,
+            "cl": cl,
+        }
+    )
+
+def standard_parametrization(opt='adam', alignment='full', n_layers=3):
+    from parametrization import abc_parametrization
+
+    al =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+    bl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+
+    if alignment == 'full':
+        if opt == 'sgd':
+            cl = [-0.5] +  [0.5] * (n_layers - 2) +  [1.0]
+        elif opt == 'adam':
+            cl =  [0.0] +  [1.0] * (n_layers - 2) +  [1.0]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+    elif alignment == 'no':
+        if opt == 'sgd':
+            cl = [-0.5] +  [0.0] * (n_layers - 2) +  [0.5]
+        elif opt == 'adam':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
 
     return Config(
         obj=abc_parametrization,
@@ -119,7 +158,7 @@ def jascha_grid():
         for c2_id, c2 in enumerate(c2_grid):
             exp_id = c1_id * len(c2_grid) + c2_id
             def mean_field_parametrization_with_diff_cl():
-                mf_cfg = parametrization('mfp', 'sgd', n_layers=2)
+                mf_cfg = param_frac('mfp', 'sgd', 'full', 2)
                 mf_cfg['cl'] = [c1, c2]
                 return mf_cfg
 
@@ -159,7 +198,7 @@ def ab_data():
     )
 
 def ab_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, resolution=5, ab_range=0.2):
-    cfg = parametrization(param, opt, alignment, n_layers)
+    cfg = param_frac(param, opt, alignment, n_layers)
     a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
     b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
 
@@ -168,7 +207,7 @@ def ab_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, resol
             exp_id = a_id * len(b_grid) + b_id
 
             def diff_ab():
-                cfg = parametrization(param, opt, alignment, n_layers)
+                cfg = param_frac(param, opt, alignment, n_layers)
                 cfg['al'][l - 1] = a
                 cfg['bl'][l - 1] = b
                 return cfg
@@ -179,7 +218,7 @@ def ab_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, resol
             yield exp_id, run_name, param_args
 
 def ab_eps_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, resolution=5, t_resolution=11, ab_range=0.2):
-    cfg = parametrization(param, opt, alignment, n_layers)
+    cfg = param_frac(param, opt, alignment, n_layers)
     a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
     b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
     eps_grid = np.linspace(0.0, 1.0, num=t_resolution).tolist()
@@ -190,7 +229,7 @@ def ab_eps_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, r
                 exp_id = (a_id * len(b_grid) + b_id) * len(eps_grid) + eps_id
 
                 def diff_ab(a=a, b=b):
-                    cfg = parametrization(param, opt, alignment, n_layers)
+                    cfg = param_frac(param, opt, alignment, n_layers)
                     cfg['al'][l - 1] = a
                     cfg['bl'][l - 1] = b
                     return cfg
@@ -205,7 +244,7 @@ def ab_eps_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, r
                 yield exp_id, run_name, param_args
 
 def ab_lr_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, resolution=5, ab_range=0.2):
-    cfg = parametrization(param, opt, alignment, n_layers)
+    cfg = param_frac(param, opt, alignment, n_layers)
     a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
     b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
     lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2]
@@ -216,7 +255,7 @@ def ab_lr_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, re
                 exp_id = (a_id * len(b_grid) + b_id) * len(lr_grid) + lr_id
 
                 def diff_ab(a=a, b=b):
-                    cfg = parametrization(param, opt, alignment, n_layers)
+                    cfg = param_frac(param, opt, alignment, n_layers)
                     cfg['al'][l - 1] = a
                     cfg['bl'][l - 1] = b
                     return cfg
@@ -273,6 +312,16 @@ def ada_frac():
             "lr": 5e-3,
         },
     )
+
+def param_frac(type, opt, alignment, n_layers):
+    if type == 'mup':
+        return mup_parametrization(opt, alignment, n_layers)
+    elif type == 'ntk':
+        return ntk_parametrization(opt, alignment, n_layers)
+    elif type == 'mfp':
+        return mfp_parametrization(opt, alignment, n_layers)
+    elif type == 'standard':
+        return standard_parametrization(opt, alignment, n_layers)
 
 def opt_frac(type):
     if type == 'sgd':
