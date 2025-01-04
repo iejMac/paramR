@@ -230,6 +230,20 @@ def ab_lr_grid(*, param='mup', opt='adam', alignment='full', n_layers=3, l=3, re
                 run_name = f"{param}_{opt}_{alignment}_a{l}_{a:.2f}_b{l}_{b:.2f}_lr_{lr:.2f}"
                 yield exp_id, run_name, param_args
 
+def mup_adam_a3b3_grid():
+    return Config(
+        obj=ab_grid,
+        params={
+            "param": 'mup',
+            "opt": 'adam',
+            "alignment": 'full',
+            "n_layers": 3,
+            "l": 3,
+            "resolution": 5,
+            "ab_range": 0.2,
+        },
+    )
+
 
 
 # Common:

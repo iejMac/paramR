@@ -213,18 +213,14 @@ def main(run_name, training_config, model_config, optimizer_config, parametrizat
         run_dir=run_dir,
     )
 
-from configs.fractal_config import jascha_grid, ab_grid, ab_eps_grid, ab_lr_grid
+from configs.fractal_config import jascha_grid, mup_adam_a3b3_grid
 
 if __name__ == "__main__":
     worker_id = int(os.environ.get("WORKER_ID", 0))
     n_workers = int(os.environ.get("N_WORKERS", 1))
 
-    param = os.environ.get("PARAM", "mup")
-    optim = os.environ.get("OPTIM", "adam")
-    align = os.environ.get("ALIGN", "full")
-    l = int(os.environ.get("L", 3))
-
-    for exp_id, run_name, param_args in ab_lr_grid(param=param, opt=optim, alignment=align, l=l):
+    grid = mup_adam_a3b3_grid
+    for exp_id, run_name, param_args in grid():
         if exp_id % n_workers == worker_id:
             t0 = time.time()
             main(run_name, *param_args)

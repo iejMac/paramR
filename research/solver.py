@@ -40,6 +40,35 @@ def min_lp(lp, *args, M):
     return X
 
 
+# https://or.stackexchange.com/a/712
+@static_vars(var_id=0)
+def max2_lp(lp, a, b, M):
+    X = plp.LpVariable(f'max2_X_{max2_lp.var_id}')
+    y = plp.LpVariable(f'max2_y_{max2_lp.var_id}', cat=plp.LpBinary)
+    max2_lp.var_id += 1
+
+    lp += a - b <= M * y
+    lp += b - a <= M * (1 - y)
+    lp += X >= a
+    lp += X >= b
+    lp += X <= a + M * (1 - y)
+    lp += X <= b + M * y
+
+    return X
+
+
+def max_lp(lp, *args, M):
+    if len(args) == 1:
+        return args[0]
+
+    X = max2_lp(lp, args[0], args[1], M)
+
+    for a in args[2:]:
+        X = max2_lp(lp, X, a, M)
+
+    return X
+
+
 def find_c_adam(a, b, alpha, u, omega, solver=None, fl=False, M=10):
     assert len(a) == len(b) == len(alpha) == len(u) == len(omega)
     n = len(a)
