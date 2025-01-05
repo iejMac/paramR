@@ -271,8 +271,30 @@ def ab_lr_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
                 run_name = f"grid_a{l}_{a:.2f}_b{l}_{b:.2f}_lr_{lr:.6f}"
                 yield exp_id, run_name, param_args
 
-def mup_adam_a3b3_grid():
+
+
+# Grid definitions:
+def mup_a3b3_grid():
     return ab_grid(
+        param_cfg=ft.partial(mup_parametrization, "adam", "full", 3),
+        opt_cfg=adamw_frac,
+        l=3,
+        resolution=5,
+        ab_range=0.2
+    )
+
+def mup_a3b3_eps_grid():
+    return ab_eps_grid(
+        param_cfg=ft.partial(mup_parametrization, "adam", "full", 3),
+        opt_cfg=adamw_frac,
+        l=3,
+        resolution=5,
+        t_resolution=11,
+        ab_range=0.2
+    )
+
+def mup_a3b3_loss_grid():
+    return ab_lr_grid(
         param_cfg=ft.partial(mup_parametrization, "adam", "full", 3),
         opt_cfg=adamw_frac,
         l=3,
