@@ -194,8 +194,9 @@ def ab_data():
             "batch_size": N_FREE_PARAMS_2,
             "width": DATA_DIM,
             "resample": False,
-            # "signal_strength": 0.5,
-            "signal_strength": 0.2,
+            "signal_fn": 'cos',
+            "signal_strength": 1.0,
+            "signal_period": 200
         }
     )
 
