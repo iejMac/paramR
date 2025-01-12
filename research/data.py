@@ -41,11 +41,15 @@ class SyntheticNormalDataset:
         self.Y = self.X @ true_weights
 
         if signal_fn == 'const':
-            self.signal_strength = lambda t: signal_strength
+            self.signal_fn = lambda t: signal_strength
         elif signal_fn == 'cos':
-            self.signal_strength = lambda t: signal_strength / 2 * (1 + torch.cos(2 * torch.pi * t / signal_period))
+            signal_period = torch.tensor(signal_period).to(device)
+            self.signal_fn = lambda t: signal_strength / 2 * (1 + torch.cos(2 * torch.pi * t / signal_period))
+        elif signal_fn == 'neg_cos':
+            signal_period = torch.tensor(signal_period).to(device)
+            self.signal_fn = lambda t: signal_strength / 2 * (1 + -torch.cos(2 * torch.pi * t / signal_period))
         else:
-            self.signal_strength = signal_strength
+            self.signal_fn = signal_fn
 
     def __iter__(self):
         while True:
@@ -59,10 +63,10 @@ class SyntheticNormalDataset:
             X = self.X[idx]
             y = self.Y[idx]
 
-            noise = torch.randn(y.shape).to(self.device)
-            signal = self.signal_strength(self.step)
+            noise = torch.randn(X.shape).to(self.device)
+            signal = self.signal_fn(self.step)
             self.step += 1
-            y = y * signal + noise * (1 - signal)
+            X = X * signal + noise * (1 - signal)
 
             yield X, y
 
