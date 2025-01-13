@@ -25,7 +25,10 @@ class CIFAR10Dataset:
             yield X, y
 
 class SyntheticNormalDataset:
-    def __init__(self, dataset_size, batch_size, width, device="cpu", resample=True, signal_fn='const', signal_strength=1.0, signal_period=100):
+    def __init__(
+            self, dataset_size, batch_size, width, device="cpu", resample=True,
+            signal_fn='const', signal_strength=1.0, signal_period=100, total_steps=200
+    ):
         self.batch_size = batch_size
         self.device = device
         self.width = width
@@ -45,9 +48,13 @@ class SyntheticNormalDataset:
         elif signal_fn == 'cos':
             signal_period = torch.tensor(signal_period).to(device)
             self.signal_fn = lambda t: signal_strength / 2 * (1 + torch.cos(2 * torch.pi * t / signal_period))
-        elif signal_fn == 'neg_cos':
+        elif signal_fn == 'sin':
             signal_period = torch.tensor(signal_period).to(device)
             self.signal_fn = lambda t: signal_strength / 2 * (1 + -torch.cos(2 * torch.pi * t / signal_period))
+        elif signal_fn == 'step':
+            self.signal_fn = lambda t: signal_strength if t < total_steps // 3 else signal_strength / 2 if t < 2 * total_steps // 3 else 0.0
+        elif signal_fn == 'step_dec':
+            self.signal_fn = lambda t: 0.0 if t < total_steps // 3 else signal_strength / 2 if t < 2 * total_steps // 3 else signal_strength
         else:
             self.signal_fn = signal_fn
 

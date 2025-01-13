@@ -173,7 +173,7 @@ def jascha_grid():
 
 # New setup:
 DATA_DIM=8
-N_FRAC_2 = 512
+N_FRAC_2 = 256
 def mlp2h():
     from model import MLP
     return Config(
