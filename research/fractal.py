@@ -94,7 +94,7 @@ def train(
         opt.zero_grad()
         y_hat = model(X)
 
-        loss = F.mse_loss(y_hat, y)
+        loss = F.cross_entropy(y_hat, y)
         loss_item = loss.item()
 
         # Check for divergence
@@ -170,6 +170,12 @@ def train(
 
                         Al.append(torch.tensor([A_cum, A_alpha, A_omega, A_u]))
                     Al = torch.stack(Al).detach().cpu().numpy()
+
+                    # TODO: a temporary fix to avoid inf/nan values in the alignment metric
+                    Al[np.isneginf(Al)] = 0.
+                    Al[np.isinf(Al)] = 1.
+                    Al[np.isnan(Al)] = 0.
+
                     metric["Als"] = Al
 
             # TESTING
