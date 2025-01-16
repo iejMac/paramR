@@ -172,18 +172,18 @@ def jascha_grid():
 
 
 # New setup:
-DATA_DIM=8
+DATA_DIM_2 = 8
 N_FRAC_2 = 256
 def mlp2h():
     from model import MLP
     return Config(
         obj=MLP,
         params={
-            "dims": [DATA_DIM, N_FRAC_2, N_FRAC_2, 1],
+            "dims": [DATA_DIM_2, N_FRAC_2, N_FRAC_2, 1],
             "bias": False,
         },
     )
-N_FREE_PARAMS_2 = (DATA_DIM * N_FRAC_2) + (N_FRAC_2 * N_FRAC_2) + (N_FRAC_2 * 1)
+N_FREE_PARAMS_2 = (DATA_DIM_2 * N_FRAC_2) + (N_FRAC_2 * N_FRAC_2) + (N_FRAC_2 * 1)
 
 def ab_data():
     from data import SyntheticNormalDataset
@@ -201,26 +201,25 @@ def ab_data():
         }
     )
 
-DATA_DIM_2=3072
-N_FRAC_3 = 256
-N_CLASSES=10
+DATA_DIM_CIFAR = 3072
+N_FRAC_CIFAR = 256
+N_CLASSES_CIFAR = 10
 def mlp2h_cifar():
     from model import MLP
     return Config(
         obj=MLP,
         params={
-            "dims": [DATA_DIM_2, N_FRAC_3, N_FRAC_3, N_CLASSES],
+            "dims": [DATA_DIM_CIFAR, N_FRAC_CIFAR, N_FRAC_CIFAR, N_CLASSES_CIFAR],
             "bias": False,
         },
     )
-N_FREE_PARAMS_3 = (DATA_DIM_2 * N_FRAC_3) + (N_FRAC_3 * N_FRAC_3) + (N_FRAC_3 * N_CLASSES)
 
 def cifar_data():
     from data import CIFAR10Dataset
     return Config(
         obj=CIFAR10Dataset,
         params={
-            "batch_size": N_FREE_PARAMS_3,
+            "batch_size": 256,
             "signal_fn": 'const',
             "signal_strength": 1.0,
             "signal_period": 1000,
