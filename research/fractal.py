@@ -94,7 +94,7 @@ def train(
         opt.zero_grad()
         y_hat = model(X)
 
-        loss = F.mse_loss(y_hat, y)
+        loss = F.cross_entropy(y_hat, y)
         loss_item = loss.item()
 
         # Check for divergence
