@@ -300,6 +300,39 @@ def ab_lr_grid(param_cfg, model_cfg, opt_cfg, data_cfg, l, resolution=5, ab_rang
                 yield exp_id, run_name, param_args
 
 
+def depth_width_lr_grid(param_cfg, opt_cfg, data_cfg):
+    # w_grid = [64, 256, 1024]
+    # l_grid = [3, 5, 7]
+    w_grid = [1024, 2048]
+    l_grid = [7, 9]
+    # lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2]
+    lr_grid = [1.0, 5e-1, 3e-1, 1e-1, 5e-2]
+
+    for l_id, l in enumerate(l_grid):
+        for w_id, w in enumerate(w_grid):
+            for lr_id, lr in enumerate(lr_grid):
+                exp_id = (l_id * len(w_grid) + w_id) * len(lr_grid) + lr_id
+
+                def mlp_lw_cifar():
+                    from model import MLP
+                    return Config(
+                        obj=MLP,
+                        params={
+                            "dims": [DATA_DIM_CIFAR] + [w] * (l - 1) + [N_CLASSES_CIFAR],
+                            "bias": False,
+                        },
+                    )
+                def opt_w_lr(lr=lr):
+                    opt_config = opt_cfg()
+                    opt_config['lr'] = lr
+                    return opt_config
+
+                param_cfg_l = ft.partial(param_cfg, n_layers=l)
+
+                param_args = (training_frac, mlp_lw_cifar, opt_w_lr, param_cfg_l, data_cfg)
+                run_name = f"grid_depth_{l}_width_{w}_lr_{lr:.6f}"
+                yield exp_id, run_name, param_args
+
 
 # Grid definitions:
 def mup_a3b3_grid():
@@ -337,7 +370,7 @@ def mup_a3b3_loss_grid():
     )
 
 def mup_a3b3_cifar_grid():
-    return ab_grid(
+    return ab_lr_grid(
         param_cfg=ft.partial(mup_parametrization, "adam", "full", 3),
         model_cfg=mlp2h_cifar,
         opt_cfg=adamw_frac,
@@ -347,7 +380,19 @@ def mup_a3b3_cifar_grid():
         ab_range=0.2
     )
 
+def mup_adam_lw_cifar_grid():
+    return depth_width_lr_grid(
+        param_cfg=ft.partial(mup_parametrization, "adam", "full"),
+        opt_cfg=adamw_frac,
+        data_cfg=cifar_data,
+    )
 
+def mup_sgd_lw_cifar_grid():
+    return depth_width_lr_grid(
+        param_cfg=ft.partial(mup_parametrization, "sgd", "full"),
+        opt_cfg=sgd_frac,
+        data_cfg=cifar_data,
+    )
 
 # Common:
 def sgd_frac():
@@ -379,7 +424,7 @@ def ada_frac():
 
 def training_frac():
     from fractal import train
-    N_STEPS = 1000
+    N_STEPS = 10000
     return Config(
         obj=train,
         params={
