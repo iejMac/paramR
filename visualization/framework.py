@@ -470,24 +470,25 @@ class GridVisualizer:
 
 def main():
     # Collect runs from both experiments
-    max_dir = "/home/maciej/code/paramR/runs/lw_grid_5k/lw_grid_max"
-    constant_dir = "/home/maciej/code/paramR/runs/lw_grid_5k/lw_grid_constant"
+    # max_dir = "/home/maciej/code/paramR/runs/lw_grid_5k/lw_grid_max"
+    # constant_dir = "/home/maciej/code/paramR/runs/lw_grid_5k/lw_grid_constant"
 
-     # Use existing collectors and grouping
-    max_collector = RunCollector(max_dir)
-    constant_collector = RunCollector(constant_dir)
+    #  # Use existing collectors and grouping
+    # max_collector = RunCollector(max_dir)
+    # constant_collector = RunCollector(constant_dir)
 
-    # # Collect runs
-    # exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_cifar_grid_lr_schedule_ablation"
-    # exp_collector = RunCollector(exp_dir)
+    # Collect runs
+    exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_cifar_grid_lr_schedule_ablation"
+    exp_collector = RunCollector(exp_dir)
 
-    # # Split into ablations
-    # constant_collector = exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
-    # max_collector = exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    # Split into ablations
+    constant_collector = exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    max_collector = exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
 
     # Load and group runs
     def group_by_architecture(run: RunData) -> Dict[str, Any]:
-        dims = run.model_config["dims"]
+        dims = run.model_config["params"]["dims"]
+        # dims = run.model_config["dims"]
         return {
             "depth": len(dims) - 1,
             "width": dims[1]
@@ -524,7 +525,15 @@ def main():
         "Loss Comparison",
     )
     fig1.savefig("losses.png", bbox_inches='tight', dpi=300)
-    
+
+    # Plot losses (automatically handles multiple runs)
+    fig1 = viz.plot_grid(
+        combined_groups, 
+        "rLs", 
+        "Feature Learning Residuals",
+    )
+    fig1.savefig("rLs.png", bbox_inches='tight', dpi=300)
+
     # Plot learning rates (automatically handles layers)
     fig2 = viz.plot_grid(
         combined_groups, 
@@ -536,7 +545,7 @@ def main():
         # Set y-axis to log scale
         ax.set_yscale('log')
         # Set fixed y limits
-        ax.set_ylim(0, 1e-2)
+        ax.set_ylim(0, 1.0)
     fig2.savefig("learning_rates.png", bbox_inches='tight', dpi=300)
     
     # Plot alignment (automatically handles layers and metrics)
@@ -544,7 +553,7 @@ def main():
         combined_groups, 
         "Als", 
         "Alignment Analysis", 
-        subsample_config={"metrics": [0]}
+        subsample_config={"metrics": [1]}
     )
     fig3.savefig("alignment.png", bbox_inches='tight', dpi=300)
     

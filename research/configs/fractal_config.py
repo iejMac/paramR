@@ -347,7 +347,7 @@ def const_lr_scheduler(*args, **kwargs):
         params={}
     )
 
-def max_lr_scheduler(n, al, bl, lr_prefactor, *args, **kwargs):
+def max_lr_scheduler(n, al, bl, lr_prefactor, feature_learning=False, *args, **kwargs):
     from parametrization import maximal_lr_scheduler
     return Config(
         obj=maximal_lr_scheduler,
@@ -356,6 +356,7 @@ def max_lr_scheduler(n, al, bl, lr_prefactor, *args, **kwargs):
             "al": al,
             "bl": bl,
             "lr_prefactor": lr_prefactor,
+            "feature_learning": feature_learning,
         }
     )
 
@@ -426,6 +427,14 @@ def mup_sgd_lw_cifar_grid_lr_schedule_ablation():
                 run_name += f"_{lr_scheduler.__name__}"
                 yield run_id, run_name, param_args
     return ablate_scheduler()
+
+def mup_sgd_lw_cifar_grid_max_lr_schedule_feature_learning():
+    return depth_width_lr_grid(
+        param_cfg=ft.partial(mup_parametrization, "adam", "full"),
+        opt_cfg=sgd_frac,
+        lr_scheduler_cfg=ft.partial(max_lr_scheduler, feature_learning=True),
+        data_cfg=cifar_data,
+    )
 
 
 # Common:
