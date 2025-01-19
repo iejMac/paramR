@@ -87,6 +87,37 @@ class MetricData:
             metric_names=metric_names
         )
 
+    def smooth(self, alpha: float = 0.1) -> 'MetricData':
+        """
+        Apply exponential moving average smoothing to the data.
+        
+        Args:
+            alpha (float): Smoothing factor between 0 and 1.
+                Lower values mean more smoothing.
+        
+        Returns:
+            MetricData: New MetricData object with smoothed data
+        """
+        smoothed_data = np.zeros_like(self.data)
+        
+        # Apply EMA smoothing to each layer and metric
+        for l in range(self.n_layers):
+            for m in range(self.n_metrics):
+                data = self.data[:, l, m]
+                smoothed = data.copy()
+                for i in range(1, len(data)):
+                    smoothed[i] = alpha * data[i] + (1 - alpha) * smoothed[i-1]
+                smoothed_data[:, l, m] = smoothed
+        
+        return MetricData(
+            data=smoothed_data,
+            n_steps=self.n_steps,
+            n_layers=self.n_layers,
+            n_metrics=self.n_metrics,
+            metric_names=self.metric_names
+        )
+
+
 class GroupKey:
     """Structured key for grouping runs with metadata"""
     def __init__(self, features: Dict[str, Any]):
@@ -353,7 +384,8 @@ class GridVisualizer:
                  named_groups: Dict[str, Dict[GroupKey, AggregationResult]],
                  metric_name: str,
                  title: Optional[str] = None,
-                 subsample_config: Dict[str, List[int]] = None) -> plt.Figure:
+                 subsample_config: Dict[str, List[int]] = None,
+                 smoothing_alpha: Optional[float] = None) -> plt.Figure:
         """Plot a metric with named groups and separated legends"""
         # Get metric configuration
         metric_config = get_metric_config(metric_name)
@@ -402,6 +434,10 @@ class GridVisualizer:
                     continue
                 
                 metric_data = agg_result.run.metrics[metric_name]
+                # Inside the plotting loop where metric_data is used:
+                if smoothing_alpha is not None:
+                    metric_data = metric_data.smooth(alpha=smoothing_alpha)
+
                 
                 # Add run to legend if first time seeing it
                 if run_idx >= len(run_elements):
@@ -470,20 +506,41 @@ class GridVisualizer:
 
 def main():
     # Collect runs from both experiments
-    # max_dir = "/home/maciej/code/paramR/runs/lw_grid_5k/lw_grid_max"
-    # constant_dir = "/home/maciej/code/paramR/runs/lw_grid_5k/lw_grid_constant"
+    prefix = ""
 
-    #  # Use existing collectors and grouping
-    # max_collector = RunCollector(max_dir)
-    # constant_collector = RunCollector(constant_dir)
+    sgd_exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_cifar_grid_lr_schedule_ablation"
+    sgd_exp_collector = RunCollector(sgd_exp_dir)
+    sgd_constant_collector = sgd_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    sgd_max_collector = sgd_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
 
-    # Collect runs
-    exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_cifar_grid_lr_schedule_ablation"
-    exp_collector = RunCollector(exp_dir)
+    sgd_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_noisy_cifar_grid_lr_schedule_ablation"
+    sgd_noisy_exp_collector = RunCollector(sgd_noisy_exp_dir)
+    sgd_noisy_constant_collector = sgd_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    sgd_noisy_max_collector = sgd_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
 
-    # Split into ablations
-    constant_collector = exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
-    max_collector = exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    adamw_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_cifar_grid_lr_schedule_ablation"
+    adamw_exp_collector = RunCollector(adamw_exp_dir)
+    adamw_constant_collector = adamw_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    adamw_max_collector = adamw_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+
+    adamw_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_noisy_cifar_grid_lr_schedule_ablation"
+    adamw_noisy_exp_collector = RunCollector(adamw_noisy_exp_dir)
+    adamw_noisy_constant_collector = adamw_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    adamw_noisy_max_collector = adamw_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+
+
+
+    exps = {
+        "sgd_const": sgd_constant_collector,
+        "sgd_max": sgd_max_collector,
+        # "sgd_noisy_const": sgd_noisy_constant_collector,
+        # "sgd_noisy_max": sgd_noisy_max_collector,
+        "adamw_const": adamw_constant_collector,
+        "adamw_max": adamw_max_collector,
+        # "adamw_noisy_const": adamw_noisy_constant_collector,
+        # "adamw_noisy_max": adamw_noisy_max_collector,
+    } 
+
 
     # Load and group runs
     def group_by_architecture(run: RunData) -> Dict[str, Any]:
@@ -493,28 +550,17 @@ def main():
             "depth": len(dims) - 1,
             "width": dims[1]
         }
-    
-    # Group both sets
-    max_groups = max_collector.group_by(group_by_architecture)
-    constant_groups = constant_collector.group_by(group_by_architecture)
-    
-    # Create dictionaries of aggregated results
-    max_agg_groups = {
-        key: MetricAggregator.best_by_final_loss(runs)
-        for key, runs in max_groups.items()
-    }
-    
-    constant_agg_groups = {
-        key: MetricAggregator.best_by_final_loss(runs)
-        for key, runs in constant_groups.items()
-    }
-    
-    # Combine into named groups for visualization
-    combined_groups = {
-        "Max LR": max_agg_groups,
-        "Constant LR": constant_agg_groups
-    }
-    
+
+    for exp_name, exp in exps.items():
+        exp_grouped = exp.group_by(group_by_architecture)
+        exp_agg = {
+            key: MetricAggregator.best_by_final_loss(runs)
+            for key, runs in exp_grouped.items()
+        }
+        exps[exp_name] = exp_agg
+
+    combined_groups = exps
+
     # Create visualization
     viz = GridVisualizer()
     
@@ -523,8 +569,9 @@ def main():
         combined_groups, 
         "losses", 
         "Loss Comparison",
+        smoothing_alpha=0.1,
     )
-    fig1.savefig("losses.png", bbox_inches='tight', dpi=300)
+    fig1.savefig(f"{prefix}losses.png", bbox_inches='tight', dpi=300)
 
     # Plot losses (automatically handles multiple runs)
     fig1 = viz.plot_grid(
@@ -532,7 +579,7 @@ def main():
         "rLs", 
         "Feature Learning Residuals",
     )
-    fig1.savefig("rLs.png", bbox_inches='tight', dpi=300)
+    fig1.savefig(f"{prefix}rLs.png", bbox_inches='tight', dpi=300)
 
     # Plot learning rates (automatically handles layers)
     fig2 = viz.plot_grid(
@@ -540,22 +587,24 @@ def main():
         "lrs", 
         "Learning Rate Schedules",
     )
-    # Customize learning rate plots
     for ax in fig2.axes:
-        # Set y-axis to log scale
         ax.set_yscale('log')
-        # Set fixed y limits
-        ax.set_ylim(0, 1.0)
-    fig2.savefig("learning_rates.png", bbox_inches='tight', dpi=300)
+        ax.set_ylim(0, 1e1)
+    fig2.savefig(f"{prefix}learning_rates.png", bbox_inches='tight', dpi=300)
     
     # Plot alignment (automatically handles layers and metrics)
-    fig3 = viz.plot_grid(
-        combined_groups, 
-        "Als", 
-        "Alignment Analysis", 
-        subsample_config={"metrics": [1]}
-    )
-    fig3.savefig("alignment.png", bbox_inches='tight', dpi=300)
+    for al_idx in range(4):
+        fig3 = viz.plot_grid(
+            combined_groups, 
+            "Als", 
+            "Alignment Analysis", 
+            subsample_config={"metrics": [al_idx]},
+            smoothing_alpha=0.1,
+        )
+        for ax in fig3.axes:
+            ax.set_ylim(0.4, 1.0)
+        al_name = METRIC_CONFIGS['Als'].component_names[al_idx]
+        fig3.savefig(f"{prefix}alignment_{al_name}.png", bbox_inches='tight', dpi=300)
     
     plt.close('all')
 
