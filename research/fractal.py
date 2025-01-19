@@ -32,7 +32,7 @@ class BinaryLogger:
             np.save(os.path.join(self.log_dir, f"{m_name}.npy"), m_dat)
 
 def train(
-        model_config, optimizer_config, parametrization_config, data_config,
+        model_config, optimizer_config, parametrization_config, lr_scheduler_config, data_config,
         n_train_steps,
         log_freq,
         seed=0,
@@ -53,8 +53,7 @@ def train(
     opt = opt_cfg.build(params=params)
 
     param_cfg = parametrization_config()
-    # scheduler = maximal_lr_scheduler(opt, n=width, al=param_cfg['al'], bl=param_cfg['bl'], lr_prefactor=opt_cfg['lr'])
-    scheduler = constant_lr_scheduler(opt)
+    lr_scheduler = lr_scheduler_config().build(optimizer=opt)
 
     train_loader = data_config().build(device=device)
 
@@ -178,13 +177,11 @@ def train(
 
                     metric["Als"] = Al
 
-            # TESTING
             alpha_l = Al[:, 1].tolist()
             omega_l = Al[:, 2].tolist()
             u_l = Al[:, 3].tolist()
-            lrs = scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
+            lrs = lr_scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
             metric["lrs"] = lrs
-            # TESTING
 
             logger.log(metric)
 
@@ -196,14 +193,15 @@ def train(
     # Save the final arrays to binary format
     logger.save()
 
-def main(run_name, training_config, model_config, optimizer_config, parametrization_config, data_config):
-    run_dir = os.path.join("/home/maciej/code/paramR/runs/runs_max_sched", run_name)
-    # run_dir = os.path.join("/home/maciej/code/paramR/runs/runs_no_sched", run_name)
+def main(run_name, exp_name, training_config, model_config, optimizer_config, lr_scheduler_config, parametrization_config, data_config):
+    run_dir = os.path.join("./runs", exp_name, run_name)
+
     os.makedirs(run_dir, exist_ok=True)
     configs = {
         "training": training_config,
         "model": model_config,
         "optimizer": optimizer_config,
+        "lr_scheduler": lr_scheduler_config,
         "parametrization": parametrization_config,
         "data": data_config,
     }
@@ -215,6 +213,7 @@ def main(run_name, training_config, model_config, optimizer_config, parametrizat
     training_config().build(
         model_config=model_config, 
         optimizer_config=optimizer_config,
+        lr_scheduler_config=lr_scheduler_config,
         parametrization_config=parametrization_config,
         data_config=data_config,
         run_dir=run_dir,
@@ -226,11 +225,12 @@ if __name__ == "__main__":
     n_workers = int(os.environ.get("N_WORKERS", 1))
 
     import configs.fractal_config
-    grid = getattr(configs.fractal_config, sys.argv[1])
+    exp_name = sys.argv[1]
+    grid = getattr(configs.fractal_config, exp_name)
 
-    for exp_id, run_name, param_args in grid():
-        if exp_id % n_workers == worker_id:
+    for run_id, run_name, param_args in grid():
+        if run_id % n_workers == worker_id:
             t0 = time.time()
-            main(run_name, *param_args)
+            main(run_name, exp_name, *param_args)
             tf = time.time()
-            print(f"Experiment {run_name} (id={exp_id}) completed in {tf - t0:.2f} seconds by worker {worker_id}.")
+            print(f"Experiment {run_name} (id={run_id}) completed in {tf - t0:.2f} seconds by worker {worker_id}.")

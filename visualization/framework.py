@@ -309,43 +309,45 @@ class GridVisualizer:
                                run_elements: List[Line2D],
                                layer_elements: List[Line2D],
                                metric_elements: List[Line2D]):
-        """Create separate legends for runs, layers, and metrics"""
+        """Create separate legends arranged horizontally at the bottom"""
         n_legends = sum([bool(run_elements), bool(layer_elements), bool(metric_elements)])
         if n_legends == 0:
             return
-            
-        current_y = 0.02  # Start position from bottom
-        
-        def add_legend(elements: List[Line2D], title: str) -> float:
+
+        # Calculate positions for each legend
+        legend_width = 1.0 / max(n_legends, 1)  # Divide available width
+        current_x = 0.0  # Start from left
+        bottom_y = 0.02  # Fixed bottom position
+
+        def add_legend(elements: List[Line2D], title: str, x_pos: float) -> None:
             if not elements:
-                return 0
-            ncol = min(5, len(elements))
+                return
+            # Make columns more compact
+            ncol = min(3, len(elements))
             legend = fig.legend(handles=elements, 
                               title=title,
                               loc='lower center',
-                              bbox_to_anchor=(0.5, current_y),
+                              bbox_to_anchor=(x_pos + legend_width/2, bottom_y),
                               ncol=ncol,
-                              fontsize=8,
-                              title_fontsize=9)
+                              fontsize=7,  # Smaller font
+                              title_fontsize=8,  # Smaller title
+                              columnspacing=1.0,  # Reduce space between columns
+                              handlelength=1.5)  # Shorter lines in legend
             fig.add_artist(legend)
-            return legend.get_window_extent().height / fig.get_window_extent().height
+
+        # Add legends side by side
+        legends_to_add = [(run_elements, "Runs"), 
+                         (layer_elements, "Layers"), 
+                         (metric_elements, "Metrics")]
         
-        # Add legends from bottom to top
-        if run_elements:
-            height = add_legend(run_elements, "Runs")
-            current_y += height + self.legend_spacing
-            
-        if layer_elements:
-            height = add_legend(layer_elements, "Layers")
-            current_y += height + self.legend_spacing
-            
-        if metric_elements:
-            height = add_legend(metric_elements, "Metrics")
-            
+        for elements, title in legends_to_add:
+            if elements:
+                add_legend(elements, title, current_x)
+                current_x += legend_width
+
         # Adjust layout to account for legends
-        total_legend_height = current_y + 0.02
-        plt.tight_layout(rect=[0, total_legend_height, 1, 0.95])
-    
+        plt.tight_layout(rect=[0, 0.15, 1, 0.95])  # Fixed space at bottom for legends
+
     def plot_grid(self,
                  named_groups: Dict[str, Dict[GroupKey, AggregationResult]],
                  metric_name: str,
@@ -357,6 +359,7 @@ class GridVisualizer:
         # Use metric display name if no title provided
         if title is None:
             title = metric_config.display_name
+            
         # Get all unique group keys
         all_keys = set()
         for groups in named_groups.values():
@@ -416,11 +419,19 @@ class GridVisualizer:
                 
                 # Add metric legend elements if needed and not already added
                 if metric_data.n_metrics > 1 and not metric_elements:
+                    config = get_metric_config(metric_name)
                     for metric_idx in range(metric_data.n_metrics):
                         style = self.style_manager.get_metric_style(metric_idx)
-                        label = (metric_data.metric_names[metric_idx] 
-                               if metric_data.metric_names 
-                               else f"Metric {metric_idx}")
+                        # Use component names/labels from config if available
+                        if config.component_names and metric_idx < len(config.component_names):
+                            component_name = config.component_names[metric_idx]
+                            label = (config.component_labels.get(component_name, component_name) 
+                                   if config.component_labels 
+                                   else component_name)
+                        else:
+                            label = (metric_data.metric_names[metric_idx] 
+                                   if metric_data.metric_names 
+                                   else f"Metric {metric_idx}")
                         metric_elements.append(
                             Line2D([0], [0], color='black', linestyle=style, label=label)
                         )
@@ -450,6 +461,7 @@ class GridVisualizer:
         self.create_separated_legends(fig, run_elements, layer_elements, metric_elements)
             
         return fig
+
 
 
 def main():
@@ -527,6 +539,7 @@ def main():
         combined_groups, 
         "Als", 
         "Alignment Analysis", 
+        # ylim=(0.0, 1.0),
         ylim=(0.0, 1.0),
     )
     fig3.savefig("alignment.png", bbox_inches='tight', dpi=300)
