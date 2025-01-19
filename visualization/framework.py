@@ -122,6 +122,7 @@ class RunData:
     path: str
     model_config: Dict
     optimizer_config: Dict
+    lr_scheduler_config: Dict
     parametrization_config: Dict
     data_config: Dict
     training_config: Dict
@@ -132,7 +133,7 @@ class RunData:
         """Load run data from directory"""
         # Load configs
         configs = {}
-        for name in ['model', 'optimizer', 'parametrization', 'data', 'training']:
+        for name in ['model', 'optimizer', 'lr_scheduler', 'parametrization', 'data', 'training']:
             config_path = os.path.join(path, f"{name}_config.json")
             try:
                 with open(config_path, 'r') as f:
@@ -352,7 +353,7 @@ class GridVisualizer:
                  named_groups: Dict[str, Dict[GroupKey, AggregationResult]],
                  metric_name: str,
                  title: Optional[str] = None,
-                 ylim: Optional[Tuple[float, float]] = None) -> plt.Figure:
+                 subsample_config: Dict[str, List[int]] = None) -> plt.Figure:
         """Plot a metric with named groups and separated legends"""
         # Get metric configuration
         metric_config = get_metric_config(metric_name)
@@ -421,6 +422,9 @@ class GridVisualizer:
                 if metric_data.n_metrics > 1 and not metric_elements:
                     config = get_metric_config(metric_name)
                     for metric_idx in range(metric_data.n_metrics):
+                        if subsample_config is not None and "metrics" in subsample_config:
+                            if metric_idx not in subsample_config["metrics"]:
+                                continue
                         style = self.style_manager.get_metric_style(metric_idx)
                         # Use component names/labels from config if available
                         if config.component_names and metric_idx < len(config.component_names):
@@ -439,15 +443,15 @@ class GridVisualizer:
                 # Plot the actual data
                 for layer_idx in range(metric_data.n_layers):
                     for metric_idx in range(metric_data.n_metrics):
+                        if subsample_config is not None and "metrics" in subsample_config:
+                            if metric_idx not in subsample_config["metrics"]:
+                                continue
                         color = self.style_manager.get_run_color(
                             run_idx, layer_idx, metric_data.n_layers
                         )
                         style = self.style_manager.get_metric_style(metric_idx)
                         data = metric_data.data[:, layer_idx, metric_idx]
                         ax.plot(data, style, color=color)
-            
-            if ylim:
-                ax.set_ylim(*ylim)
             
             # Subplot title
             title_lines = [str(group_key)]
@@ -466,9 +470,21 @@ class GridVisualizer:
 
 def main():
     # Collect runs from both experiments
-    max_dir = "/home/maciej/code/paramR/runs/lw_grid/max"
-    constant_dir = "/home/maciej/code/paramR/runs/lw_grid/constant"
-    
+    max_dir = "/home/maciej/code/paramR/runs/lw_grid_5k/lw_grid_max"
+    constant_dir = "/home/maciej/code/paramR/runs/lw_grid_5k/lw_grid_constant"
+
+     # Use existing collectors and grouping
+    max_collector = RunCollector(max_dir)
+    constant_collector = RunCollector(constant_dir)
+
+    # # Collect runs
+    # exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_cifar_grid_lr_schedule_ablation"
+    # exp_collector = RunCollector(exp_dir)
+
+    # # Split into ablations
+    # constant_collector = exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    # max_collector = exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+
     # Load and group runs
     def group_by_architecture(run: RunData) -> Dict[str, Any]:
         dims = run.model_config["dims"]
@@ -476,10 +492,6 @@ def main():
             "depth": len(dims) - 1,
             "width": dims[1]
         }
-    
-    # Use existing collectors and grouping
-    max_collector = RunCollector(max_dir)
-    constant_collector = RunCollector(constant_dir)
     
     # Group both sets
     max_groups = max_collector.group_by(group_by_architecture)
@@ -501,13 +513,6 @@ def main():
         "Max LR": max_agg_groups,
         "Constant LR": constant_agg_groups
     }
-    
-    # Define common subsetting configuration
-    # subset_config = {
-    #     'steps': slice(500, 1000),  # Steps 500-1000
-    #     'layers': [0, 1],           # First two layers
-    #     'metrics': [0]              # First metric only
-    # }
     
     # Create visualization
     viz = GridVisualizer()
@@ -539,8 +544,7 @@ def main():
         combined_groups, 
         "Als", 
         "Alignment Analysis", 
-        # ylim=(0.0, 1.0),
-        ylim=(0.0, 1.0),
+        subsample_config={"metrics": [0]}
     )
     fig3.savefig("alignment.png", bbox_inches='tight', dpi=300)
     
