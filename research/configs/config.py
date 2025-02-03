@@ -7,7 +7,8 @@ class Config:
 
     def get_params(self):
         # Return common JSON-serializable types (for checkpointing)
-        return {k: v for k, v in self.init_params.items() if isinstance(v, (int, float, str, list, dict, bool, type(None)))}
+        init_params = {k: v for k, v in self.init_params.items() if isinstance(v, (int, float, str, list, dict, bool, type(None)))}
+        return {"obj": self.obj.__name__, "params": init_params}
 
     def __getitem__(self, key):
         return self.init_params[key]

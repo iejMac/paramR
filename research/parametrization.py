@@ -121,7 +121,7 @@ def abc_parametrization(mlp, n, al, bl, cl, lr_prefactor=0.1, std_prefactor=2**0
 
 from solver import find_c_adam, find_c_sgd
 
-def maximal_lr_scheduler(optimizer, n, al, bl, lr_prefactor=0.1):
+def maximal_lr_scheduler(optimizer, n, al, bl, lr_prefactor=0.1, feature_learning=False):
     def _compute_cl(alpha_l, omega_l, u_l):
         # Find maximal lr exponents
         if isinstance(optimizer, torch.optim.AdamW):
@@ -130,7 +130,7 @@ def maximal_lr_scheduler(optimizer, n, al, bl, lr_prefactor=0.1):
             solver = find_c_sgd
         else:
             raise ValueError(f"Unsupported optimizer: {type(optimizer)}")
-        cl, rl = solver(a=al, b=bl, alpha=alpha_l, u=u_l, omega=omega_l)
+        cl, rl = solver(a=al, b=bl, alpha=alpha_l, u=u_l, omega=omega_l, fl=feature_learning)
         return cl
 
     def _lr_adjuster(alpha_l, u_l, omega_l):
