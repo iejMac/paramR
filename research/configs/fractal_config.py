@@ -158,7 +158,7 @@ def jascha_grid():
 
     for c1_id, c1 in enumerate(c1_grid):
         for c2_id, c2 in enumerate(c2_grid):
-            exp_id = c1_id * len(c2_grid) + c2_id
+            run_id = c1_id * len(c2_grid) + c2_id
             def mean_field_parametrization_with_diff_cl():
                 mf_cfg = mfp_parametrization('sgd', 'full', 2)
                 mf_cfg['cl'] = [c1, c2]
@@ -167,23 +167,23 @@ def jascha_grid():
             param_args = (training_frac, mlp1h, sgd_frac, mean_field_parametrization_with_diff_cl, jascha_data)
 
             run_name = f"mfp_c1_{c1:.14f}_c2_{c2:.14f}"
-            yield exp_id, run_name, param_args
+            yield run_id, run_name, param_args
 
 
 
 # New setup:
-DATA_DIM=2
-N_FRAC_2 = 64
+DATA_DIM_2 = 8
+N_FRAC_2 = 256
 def mlp2h():
     from model import MLP
     return Config(
         obj=MLP,
         params={
-            "dims": [DATA_DIM, N_FRAC_2, N_FRAC_2, 1],
+            "dims": [DATA_DIM_2, N_FRAC_2, N_FRAC_2, 1],
             "bias": False,
         },
     )
-N_FREE_PARAMS_2 = (DATA_DIM * N_FRAC_2) + (N_FRAC_2 * N_FRAC_2) + (N_FRAC_2 * 1)
+N_FREE_PARAMS_2 = (DATA_DIM_2 * N_FRAC_2) + (N_FRAC_2 * N_FRAC_2) + (N_FRAC_2 * 1)
 
 def ab_data():
     from data import SyntheticNormalDataset
@@ -194,20 +194,87 @@ def ab_data():
             "batch_size": N_FREE_PARAMS_2,
             "width": DATA_DIM,
             "resample": False,
-            "signal_fn": 'cos',
+            "signal_fn": 'const',
             "signal_strength": 1.0,
-            "signal_period": 200
+            "signal_period": 1000,
+            "total_steps": 1000
         }
     )
 
-def ab_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
+DATA_DIM_CIFAR = 3072
+N_FRAC_CIFAR = 256
+N_CLASSES_CIFAR = 10
+def mlp2h_cifar():
+    from model import MLP
+    return Config(
+        obj=MLP,
+        params={
+            "dims": [DATA_DIM_CIFAR, N_FRAC_CIFAR, N_FRAC_CIFAR, N_CLASSES_CIFAR],
+            "bias": False,
+        },
+    )
+
+def cifar_data():
+    from data import CIFAR10Dataset
+    return Config(
+        obj=CIFAR10Dataset,
+        params={
+            "batch_size": 256,
+            "signal_fn": 'const',
+            "signal_strength": 1.0,
+            "signal_period": 1000,
+            "total_steps": 1000
+        }
+    )
+
+def cifar_noisy_data():
+    from data import CIFAR10Dataset
+    return Config(
+        obj=CIFAR10Dataset,
+        params={
+            "batch_size": 256,
+            "signal_fn": 'const',
+            "signal_strength": 0.5,
+            "signal_period": 1000,
+            "total_steps": 1000
+        }
+    )
+
+def cifar_cos_noisy_data():
+    from data import CIFAR10Dataset
+    return Config(
+        obj=CIFAR10Dataset,
+        params={
+            "batch_size": 256,
+            "signal_fn": 'cos',
+            "signal_strength": 0.7,
+            "signal_range": 0.2,
+            "signal_period": 100,
+            "total_steps": 1000
+        }
+    )
+
+def cifar_very_noisy_data():
+    from data import CIFAR10Dataset
+    return Config(
+        obj=CIFAR10Dataset,
+        params={
+            "batch_size": 256,
+            "signal_fn": 'const',
+            "signal_strength": 0.2,
+            "signal_period": 1000,
+            "total_steps": 1000
+        }
+    )
+
+def ab_grid(param_cfg, model_cfg, opt_cfg, data_cfg, l, resolution=5, ab_range=0.2):
     cfg = param_cfg()
     a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
     b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
 
     for a_id, a in enumerate(a_grid):
         for b_id, b in enumerate(b_grid):
-            exp_id = a_id * len(b_grid) + b_id
+            run_id = a_id * len(b_grid) + b_id
 
             def diff_ab():
                 cfg = param_cfg()
@@ -215,12 +282,12 @@ def ab_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
                 cfg['bl'][l - 1] = b
                 return cfg
 
-            param_args = (training_frac, mlp2h, opt_cfg, diff_ab, ab_data)
+            param_args = (training_frac, model_cfg, opt_cfg, diff_ab, data_cfg)
 
             run_name = f"grid_a{l}_{a:.2f}_b{l}_{b:.2f}"
-            yield exp_id, run_name, param_args
+            yield run_id, run_name, param_args
 
-def ab_eps_grid(param_cfg, opt_cfg, l, resolution=5, t_resolution=11, ab_range=0.2):
+def ab_eps_grid(param_cfg, model_cfg, opt_cfg, data_cfg, l, resolution=5, t_resolution=11, ab_range=0.2):
     cfg = param_cfg()
     a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
     b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
@@ -229,7 +296,7 @@ def ab_eps_grid(param_cfg, opt_cfg, l, resolution=5, t_resolution=11, ab_range=0
     for a_id, a in enumerate(a_grid):
         for b_id, b in enumerate(b_grid):
             for eps_id, eps in enumerate(eps_grid):
-                exp_id = (a_id * len(b_grid) + b_id) * len(eps_grid) + eps_id
+                run_id = (a_id * len(b_grid) + b_id) * len(eps_grid) + eps_id
 
                 def diff_ab(a=a, b=b):
                     cfg = param_cfg()
@@ -238,15 +305,15 @@ def ab_eps_grid(param_cfg, opt_cfg, l, resolution=5, t_resolution=11, ab_range=0
                     return cfg
 
                 def ab_data_w_signal(eps=eps):
-                    data_cfg = ab_data()
-                    data_cfg["signal_strength"] = eps
-                    return data_cfg
+                    noisy_data_cfg = data_cfg()
+                    noisy_data_cfg["signal_strength"] = eps
+                    return noisy_data_cfg
 
-                param_args = (training_frac, mlp2h, opt_cfg, diff_ab, ab_data_w_signal)
+                param_args = (training_frac, model_cfg, opt_cfg, diff_ab, ab_data_w_signal)
                 run_name = f"grid_a{l}_{a:.2f}_b{l}_{b:.2f}_eps_{eps:.2f}"
-                yield exp_id, run_name, param_args
+                yield run_id, run_name, param_args
 
-def ab_lr_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
+def ab_lr_grid(param_cfg, model_cfg, opt_cfg, data_cfg, l, resolution=5, ab_range=0.2):
     cfg = param_cfg()
     a_grid = np.linspace(cfg['al'][l - 1] - ab_range, cfg['al'][l - 1] + ab_range, num=resolution).tolist()
     b_grid = np.linspace(cfg['bl'][l - 1] - ab_range, cfg['bl'][l - 1] + ab_range, num=resolution).tolist()
@@ -255,7 +322,7 @@ def ab_lr_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
     for a_id, a in enumerate(a_grid):
         for b_id, b in enumerate(b_grid):
             for lr_id, lr in enumerate(lr_grid):
-                exp_id = (a_id * len(b_grid) + b_id) * len(lr_grid) + lr_id
+                run_id = (a_id * len(b_grid) + b_id) * len(lr_grid) + lr_id
 
                 def diff_ab(a=a, b=b):
                     cfg = param_cfg()
@@ -268,17 +335,82 @@ def ab_lr_grid(param_cfg, opt_cfg, l, resolution=5, ab_range=0.2):
                     opt_config['lr'] = lr
                     return opt_config
 
-                param_args = (training_frac, mlp2h, opt_w_lr, diff_ab, ab_data)
+                param_args = (training_frac, model_cfg, opt_w_lr, diff_ab, data_cfg)
                 run_name = f"grid_a{l}_{a:.2f}_b{l}_{b:.2f}_lr_{lr:.6f}"
-                yield exp_id, run_name, param_args
+                yield run_id, run_name, param_args
 
+
+def depth_width_lr_grid(param_cfg, opt_cfg, lr_scheduler_cfg, data_cfg):
+    # w_grid = [64, 256, 1024]
+    # l_grid = [3, 5, 7]
+    # lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2]
+    w_grid = [1024, 2048]
+    l_grid = [7, 9]
+
+    if opt_cfg == sgd_frac:
+        lr_grid = [2.0, 1.0, 5e-1, 3e-1, 1e-1, 5e-2, 3e-2]
+    elif opt_cfg == adamw_frac:
+        lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2, 5e-3]
+
+    for l_id, l in enumerate(l_grid):
+        for w_id, w in enumerate(w_grid):
+            for lr_id, lr in enumerate(lr_grid):
+                run_id = (l_id * len(w_grid) + w_id) * len(lr_grid) + lr_id
+
+                def mlp_lw_cifar():
+                    from model import MLP
+                    return Config(
+                        obj=MLP,
+                        params={
+                            "dims": [DATA_DIM_CIFAR] + [w] * (l - 1) + [N_CLASSES_CIFAR],
+                            "bias": False,
+                        },
+                    )
+                def opt_w_lr(lr=lr):
+                    opt_config = opt_cfg()
+                    opt_config['lr'] = lr
+                    return opt_config
+
+                param_cfg_l = ft.partial(param_cfg, n_layers=l)
+                
+                param = param_cfg_l()
+                al = param['al']
+                bl = param['bl']
+                lr_scheduler_cfg = ft.partial(lr_scheduler_cfg, n=w, al=al, bl=bl, lr_prefactor=lr)
+
+                param_args = (training_frac, mlp_lw_cifar, opt_w_lr, lr_scheduler_cfg, param_cfg_l, data_cfg)
+                run_name = f"grid_depth_{l}_width_{w}_lr_{lr:.6f}"
+                yield run_id, run_name, param_args
+
+
+def const_lr_scheduler(*args, **kwargs):
+    from parametrization import constant_lr_scheduler
+    return Config(
+        obj=constant_lr_scheduler,
+        params={}
+    )
+
+def max_lr_scheduler(n, al, bl, lr_prefactor, feature_learning=False, *args, **kwargs):
+    from parametrization import maximal_lr_scheduler
+    return Config(
+        obj=maximal_lr_scheduler,
+        params={
+            "n": n,
+            "al": al,
+            "bl": bl,
+            "lr_prefactor": lr_prefactor,
+            "feature_learning": feature_learning,
+        }
+    )
 
 
 # Grid definitions:
 def mup_a3b3_grid():
     return ab_grid(
         param_cfg=ft.partial(mup_parametrization, "adam", "full", 3),
+        model_cfg=mlp2h,
         opt_cfg=adamw_frac,
+        data_cfg=ab_data,
         l=3,
         resolution=5,
         ab_range=0.2
@@ -287,7 +419,9 @@ def mup_a3b3_grid():
 def mup_a3b3_eps_grid():
     return ab_eps_grid(
         param_cfg=ft.partial(mup_parametrization, "adam", "full", 3),
+        model_cfg=mlp2h,
         opt_cfg=adamw_frac,
+        data_cfg=ab_data,
         l=3,
         resolution=5,
         t_resolution=11,
@@ -297,12 +431,126 @@ def mup_a3b3_eps_grid():
 def mup_a3b3_loss_grid():
     return ab_lr_grid(
         param_cfg=ft.partial(mup_parametrization, "adam", "full", 3),
+        model_cfg=mlp2h,
         opt_cfg=adamw_frac,
+        data_cfg=ab_data,
         l=3,
         resolution=5,
         ab_range=0.2
     )
 
+def mup_a3b3_cifar_grid():
+    return ab_lr_grid(
+        param_cfg=ft.partial(mup_parametrization, "adam", "full", 3),
+        model_cfg=mlp2h_cifar,
+        opt_cfg=adamw_frac,
+        data_cfg=cifar_data,
+        l=3,
+        resolution=5,
+        ab_range=0.2
+    )
+
+
+
+def mup_sgd_lw_cifar_grid_lr_schedule_ablation():
+    def ablate_scheduler():
+        for lr_scheduler in [const_lr_scheduler, max_lr_scheduler]:
+            for run_id, run_name, param_args in depth_width_lr_grid(
+                param_cfg=ft.partial(mup_parametrization, "sgd", "full"),
+                opt_cfg=sgd_frac,
+                lr_scheduler_cfg=ft.partial(lr_scheduler),
+                data_cfg=cifar_data,
+            ):
+                run_name += f"_{lr_scheduler.__name__}"
+                yield run_id, run_name, param_args
+    return ablate_scheduler()
+
+def mup_sgd_lw_cifar_grid_max_lr_schedule_feature_learning():
+    return depth_width_lr_grid(
+        param_cfg=ft.partial(mup_parametrization, "sgd", "full"),
+        opt_cfg=sgd_frac,
+        lr_scheduler_cfg=ft.partial(max_lr_scheduler, feature_learning=True),
+        data_cfg=cifar_data,
+    )
+
+def mup_sgd_lw_noisy_cifar_grid_lr_schedule_ablation():
+    def ablate_scheduler():
+        for lr_scheduler in [const_lr_scheduler, max_lr_scheduler]:
+            for run_id, run_name, param_args in depth_width_lr_grid(
+                param_cfg=ft.partial(mup_parametrization, "sgd", "full"),
+                opt_cfg=sgd_frac,
+                lr_scheduler_cfg=ft.partial(lr_scheduler),
+                data_cfg=cifar_noisy_data,
+            ):
+                run_name += f"_{lr_scheduler.__name__}"
+                yield run_id, run_name, param_args
+    return ablate_scheduler()
+
+def mup_sgd_lw_very_noisy_cifar_grid_lr_schedule_ablation():
+    def ablate_scheduler():
+        for lr_scheduler in [const_lr_scheduler, max_lr_scheduler]:
+            for run_id, run_name, param_args in depth_width_lr_grid(
+                param_cfg=ft.partial(mup_parametrization, "sgd", "full"),
+                opt_cfg=sgd_frac,
+                lr_scheduler_cfg=ft.partial(lr_scheduler),
+                data_cfg=cifar_very_noisy_data,
+            ):
+                run_name += f"_{lr_scheduler.__name__}"
+                yield run_id, run_name, param_args
+    return ablate_scheduler()
+
+
+def mup_adamw_lw_cifar_grid_lr_schedule_ablation():
+    def ablate_scheduler():
+        for lr_scheduler in [const_lr_scheduler, max_lr_scheduler]:
+            for run_id, run_name, param_args in depth_width_lr_grid(
+                param_cfg=ft.partial(mup_parametrization, "adam", "full"),
+                opt_cfg=adamw_frac,
+                lr_scheduler_cfg=ft.partial(lr_scheduler),
+                data_cfg=cifar_data,
+            ):
+                run_name += f"_{lr_scheduler.__name__}"
+                yield run_id, run_name, param_args
+    return ablate_scheduler()
+
+def mup_adamw_lw_noisy_cifar_grid_lr_schedule_ablation():
+    def ablate_scheduler():
+        for lr_scheduler in [const_lr_scheduler, max_lr_scheduler]:
+            for run_id, run_name, param_args in depth_width_lr_grid(
+                param_cfg=ft.partial(mup_parametrization, "adam", "full"),
+                opt_cfg=adamw_frac,
+                lr_scheduler_cfg=ft.partial(lr_scheduler),
+                data_cfg=cifar_noisy_data,
+            ):
+                run_name += f"_{lr_scheduler.__name__}"
+                yield run_id, run_name, param_args
+    return ablate_scheduler()
+
+def mup_adamw_lw_cos_noisy_cifar_grid_lr_schedule_ablation():
+    def ablate_scheduler():
+        for lr_scheduler in [const_lr_scheduler, max_lr_scheduler]:
+            for run_id, run_name, param_args in depth_width_lr_grid(
+                param_cfg=ft.partial(mup_parametrization, "adam", "full"),
+                opt_cfg=adamw_frac,
+                lr_scheduler_cfg=ft.partial(lr_scheduler),
+                data_cfg=cifar_noisy_data,
+            ):
+                run_name += f"_{lr_scheduler.__name__}"
+                yield run_id, run_name, param_args
+    return ablate_scheduler()
+
+def mup_adamw_lw_very_noisy_cifar_grid_lr_schedule_ablation():
+    def ablate_scheduler():
+        for lr_scheduler in [const_lr_scheduler, max_lr_scheduler]:
+            for run_id, run_name, param_args in depth_width_lr_grid(
+                param_cfg=ft.partial(mup_parametrization, "adam", "full"),
+                opt_cfg=adamw_frac,
+                lr_scheduler_cfg=ft.partial(lr_scheduler),
+                data_cfg=cifar_very_noisy_data,
+            ):
+                run_name += f"_{lr_scheduler.__name__}"
+                yield run_id, run_name, param_args
+    return ablate_scheduler()
 
 
 # Common:
@@ -335,7 +583,7 @@ def ada_frac():
 
 def training_frac():
     from fractal import train
-    N_STEPS = 200
+    N_STEPS = 10000
     return Config(
         obj=train,
         params={
