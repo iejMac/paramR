@@ -225,6 +225,26 @@ class RunCollector:
 class MetricAggregator:
     """Aggregates metrics across multiple runs"""
     
+    # @staticmethod
+    # def best_by_final_loss(runs: List[RunData], window: int = 10) -> AggregationResult:
+    #     """Select run with best (lowest) average loss over last window steps"""
+    #     def score(run: RunData) -> float:
+    #         if 'losses' not in run.metrics:
+    #             return float('inf')
+    #         losses = run.metrics['losses'].data[:, 0, 0]  # Get 1D array
+    #         return float(np.mean(losses[-window:]))
+        
+    #     best_run = min(runs, key=score)
+    #     best_score = score(best_run)
+
+    #     return AggregationResult(
+    #         run=best_run,
+    #         metadata={
+    #             'final_loss': best_score,
+    #             'window_size': window
+    #         }
+    #     )
+
     @staticmethod
     def best_by_final_loss(runs: List[RunData], window: int = 10) -> AggregationResult:
         """Select run with best (lowest) average loss over last window steps"""
@@ -236,14 +256,12 @@ class MetricAggregator:
         
         best_run = min(runs, key=score)
         best_score = score(best_run)
-        
+
         return AggregationResult(
             run=best_run,
-            metadata={
-                'final_loss': best_score,
-                'window_size': window
-            }
+            metadata={}
         )
+
 
 
 class StyleManager:
@@ -441,14 +459,27 @@ class GridVisualizer:
                 
                 # Add run to legend if first time seeing it
                 if run_idx >= len(run_elements):
+                    # base_color = self.style_manager.get_run_color(run_idx, 0, 1)
+                    # run_elements.append(
+                    #     Line2D([0], [0], color=base_color, label=run_name)
+                    # )
+
                     base_color = self.style_manager.get_run_color(run_idx, 0, 1)
+                    # Get lr from the run's optimizer config
+
+                    # TODO: make this configurable
+                    lr = agg_result.run.optimizer_config['params']['lr']
+                    lr_str = f" (lr={lr})" if lr is not None else ""
                     run_elements.append(
-                        Line2D([0], [0], color=base_color, label=run_name)
+                        Line2D([0], [0], color=base_color, label=f"{run_name}{lr_str}")
                     )
                 
                 # Add layer legend elements if needed and not already added
                 if metric_data.n_layers > 1 and not layer_elements:
                     for layer_idx in range(metric_data.n_layers):
+                        if subsample_config is not None and "layers" in subsample_config:
+                            if layer_idx not in subsample_config["layers"]:
+                                continue
                         color = self.style_manager.get_layer_colors(metric_data.n_layers)[layer_idx]
                         layer_elements.append(
                             Line2D([0], [0], color=color, label=f"Layer {layer_idx}")
@@ -478,6 +509,9 @@ class GridVisualizer:
                 
                 # Plot the actual data
                 for layer_idx in range(metric_data.n_layers):
+                    if subsample_config is not None and "layers" in subsample_config:
+                        if layer_idx not in subsample_config["layers"]:
+                            continue
                     for metric_idx in range(metric_data.n_metrics):
                         if subsample_config is not None and "metrics" in subsample_config:
                             if metric_idx not in subsample_config["metrics"]:
@@ -506,46 +540,68 @@ class GridVisualizer:
 
 def main():
     # Collect runs from both experiments
-    prefix = ""
+    prefix = "adamw_very_noisy"
 
-    sgd_exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_cifar_grid_lr_schedule_ablation"
-    sgd_exp_collector = RunCollector(sgd_exp_dir)
-    sgd_constant_collector = sgd_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
-    sgd_max_collector = sgd_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    exps = {}
+
+    # sgd_exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_cifar_grid_lr_schedule_ablation"
+    # sgd_exp_collector = RunCollector(sgd_exp_dir)
+    # sgd_exp_collector = sgd_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
+
+    # sgd_constant_collector = sgd_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    # sgd_max_collector = sgd_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    # exps["sgd_const"] = sgd_constant_collector
+    # exps["sgd_max"] = sgd_max_collector
+
+    # sgd_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_noisy_cifar_grid_lr_schedule_ablation"
+    # sgd_noisy_exp_collector = RunCollector(sgd_noisy_exp_dir)
+    # sgd_noisy_exp_collector = sgd_noisy_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
+
+    # sgd_noisy_constant_collector = sgd_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    # sgd_noisy_max_collector = sgd_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    # exps["sgd_noisy_const"] = sgd_noisy_constant_collector
+    # exps["sgd_noisy_max"] = sgd_noisy_max_collector
 
     sgd_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_noisy_cifar_grid_lr_schedule_ablation"
     sgd_noisy_exp_collector = RunCollector(sgd_noisy_exp_dir)
+    sgd_noisy_exp_collector = sgd_noisy_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
+
     sgd_noisy_constant_collector = sgd_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
     sgd_noisy_max_collector = sgd_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    exps["sgd_noisy_const"] = sgd_noisy_constant_collector
+    exps["sgd_noisy_max"] = sgd_noisy_max_collector
 
-    adamw_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_cifar_grid_lr_schedule_ablation"
-    adamw_exp_collector = RunCollector(adamw_exp_dir)
-    adamw_constant_collector = adamw_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
-    adamw_max_collector = adamw_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    # adamw_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_cifar_grid_lr_schedule_ablation"
+    # adamw_exp_collector = RunCollector(adamw_exp_dir)
+    # adamw_exp_collector = adamw_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
 
-    adamw_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_noisy_cifar_grid_lr_schedule_ablation"
-    adamw_noisy_exp_collector = RunCollector(adamw_noisy_exp_dir)
-    adamw_noisy_constant_collector = adamw_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
-    adamw_noisy_max_collector = adamw_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    # adamw_constant_collector = adamw_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    # adamw_max_collector = adamw_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    # exps["adamw_const"] = adamw_constant_collector
+    # exps["adamw_max"] = adamw_max_collector
 
+    # adamw_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_noisy_cifar_grid_lr_schedule_ablation"
+    # adamw_noisy_exp_collector = RunCollector(adamw_noisy_exp_dir)
+    # adamw_noisy_exp_collector = adamw_noisy_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
 
+    # adamw_noisy_constant_collector = adamw_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    # adamw_noisy_max_collector = adamw_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    # exps["adamw_noisy_const"] = adamw_noisy_constant_collector
+    # exps["adamw_noisy_max"] = adamw_noisy_max_collector
 
-    exps = {
-        "sgd_const": sgd_constant_collector,
-        "sgd_max": sgd_max_collector,
-        # "sgd_noisy_const": sgd_noisy_constant_collector,
-        # "sgd_noisy_max": sgd_noisy_max_collector,
-        "adamw_const": adamw_constant_collector,
-        "adamw_max": adamw_max_collector,
-        # "adamw_noisy_const": adamw_noisy_constant_collector,
-        # "adamw_noisy_max": adamw_noisy_max_collector,
-    } 
+    adamw_very_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_very_noisy_cifar_grid_lr_schedule_ablation"
+    adamw_very_noisy_exp_collector = RunCollector(adamw_very_noisy_exp_dir)
+    adamw_very_noisy_exp_collector = adamw_very_noisy_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
+
+    adamw_very_noisy_constant_collector = adamw_very_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    adamw_very_noisy_max_collector = adamw_very_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    exps["adamw_very_noisy_const"] = adamw_very_noisy_constant_collector
+    exps["adamw_very_noisy_max"] = adamw_very_noisy_max_collector
 
 
     # Load and group runs
     def group_by_architecture(run: RunData) -> Dict[str, Any]:
         dims = run.model_config["params"]["dims"]
-        # dims = run.model_config["dims"]
         return {
             "depth": len(dims) - 1,
             "width": dims[1]
@@ -586,6 +642,7 @@ def main():
         combined_groups, 
         "lrs", 
         "Learning Rate Schedules",
+        subsample_config={"layers": [0, 3, 6, 8]},
     )
     for ax in fig2.axes:
         ax.set_yscale('log')
@@ -598,7 +655,7 @@ def main():
             combined_groups, 
             "Als", 
             "Alignment Analysis", 
-            subsample_config={"metrics": [al_idx]},
+            subsample_config={"metrics": [al_idx], "layers": [0, 3, 6, 8]},
             smoothing_alpha=0.1,
         )
         for ax in fig3.axes:
