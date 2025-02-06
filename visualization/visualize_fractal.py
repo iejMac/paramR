@@ -12,16 +12,16 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
 # Parameters
-runs_dir = "/home/maciej/code/salmon/workloads/cifar-10/runs/runs"
-visualizations_dir = "./figures"
-exp_name = "testing"
+runs_dir = "/home/maciej/code/paramR/runs/our_jascha_grid"
+visualizations_dir = "./"
+exp_name = "testing_high_signal_randY"
 output_image = os.path.join(visualizations_dir, f"{exp_name}.png")
 output_array = os.path.join(visualizations_dir, f"{exp_name}.npy")
 max_val = 1e6
 
 # User-configurable grid parameters
 # grid_parameters = ['a3', 'b3']  # Example: change to ['cl.0', 'cl.1'] for cl[0] and cl[1]
-grid_parameters = ['al.2', 'bl.2']
+grid_parameters = ['cl.0', 'cl.1']
 
 # Ensure exactly two grid parameters are specified
 if len(grid_parameters) != 2:
@@ -32,7 +32,7 @@ def load_parametrization_config(run_dir):
     config_path = os.path.join(run_dir, "parametrization_config.json")
     with open(config_path, "r") as f:
         config = json.load(f)
-    return config
+    return config['params']
 
 def load_metrics(run_dir, metric_filename):
     """Load the binary metric file to get the training metric values."""

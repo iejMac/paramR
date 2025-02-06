@@ -39,6 +39,7 @@ class CIFAR10Dataset(NoisyDataset):
         super().__init__(device, signal_fn, signal_strength, signal_range, signal_period, total_steps)
         self.batch_size = batch_size
         self.device = device
+        self.type = "classification"
 
         self.transform = transforms.Normalize(CIFAR_MEAN, CIFAR_STD)
         dataset = torchvision.datasets.CIFAR10(root=root, train=train, download=True)
@@ -72,6 +73,7 @@ class SyntheticNormalDataset(NoisyDataset):
         self.width = width
         self.dataset_size = dataset_size
         self.resample = resample
+        self.type = "regression"
 
         # Generate synthetic data from a standard normal distribution.
         self.X = torch.randn(self.dataset_size, width).to(device)
