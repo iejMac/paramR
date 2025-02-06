@@ -60,30 +60,55 @@ def train(
     metrics = {
         "losses": (1,),
         "rLs": (1,),
-        "Als": (model.n_layers, 4),  # A_cum, A_alpha, A_omega, A_u
-        "lrs": (model.n_layers,)
     }
+
+    fractal_mode = True
+    if not fractal_mode:
+        metrics.update({
+            "Als": (model.n_layers, 4),  # A_cum, A_alpha, A_omega, A_u
+            "lrs": (model.n_layers,)
+        })
+
     logger = BinaryLogger(run_dir, n_steps=n_train_steps, metrics=metrics)
 
-    log_sample_size = 32
-    trace = {}
-    def trace_layer(name):
-        def hook(model, input, output):
-            trace[name] = {
-                "input": input[0][:log_sample_size].detach(),
-                "output": output[:log_sample_size].detach(),
-                "weight": model.weight.data.detach(),
-            }
-        return hook
-    for l_id, l in enumerate(model.layers):
-        l.register_forward_hook(trace_layer(f'lin_{l_id}'))
+    if not fractal_mode:
+        log_sample_size = 32
+        trace = {}
+        def trace_layer(name):
+            def hook(model, input, output):
+                trace[name] = {
+                    "input": input[0][:log_sample_size].detach(),
+                    "output": output[:log_sample_size].detach(),
+                    "weight": model.weight.data.detach(),
+                }
+            return hook
+        for l_id, l in enumerate(model.layers):
+            l.register_forward_hook(trace_layer(f'lin_{l_id}'))
 
-    # Compute initial features
-    measurement_X, _ = next(iter(train_loader))
-    with torch.no_grad():
-        model(measurement_X)
-    zL_init = trace[f'lin_{model.n_layers - 1}']["input"].clone()
-    trace_init = copy.deepcopy(trace)
+        # Compute initial features
+        measurement_X, _ = next(iter(train_loader))
+        with torch.no_grad():
+            model(measurement_X)
+        zL_init = trace[f'lin_{model.n_layers - 1}']["input"].clone()
+        trace_init = copy.deepcopy(trace)
+    elif 'rLs' in metrics:
+        # faster for rLs
+        trace = {}
+
+        def get_activation(name):
+            def hook(model, input, output):
+                trace[name] = {'input': input[0].detach()}  # input[0] is the input to the last layer
+            return hook
+
+        # Register hook on the last layer to capture its input (features)
+        model.layers[-1].register_forward_hook(get_activation(f'lin_{model.n_layers - 1}'))
+
+        # Set up a fixed measurement batch for logging
+        measurement_X, _ = next(iter(train_loader))
+        # Compute initial features
+        with torch.no_grad():
+            model(measurement_X)
+            zL_init = trace[f'lin_{model.n_layers - 1}']['input']
 
     s = 0
     diverged = False
@@ -93,7 +118,10 @@ def train(
         opt.zero_grad()
         y_hat = model(X)
 
-        loss = F.cross_entropy(y_hat, y)
+        if train_loader.type == "classification":
+            loss = F.cross_entropy(y_hat, y)
+        elif train_loader.type == "regression":
+            loss = F.mse_loss(y_hat, y)
         loss_item = loss.item()
 
         # Check for divergence
@@ -177,11 +205,20 @@ def train(
 
                     metric["Als"] = Al
 
-            alpha_l = Al[:, 1].tolist()
-            omega_l = Al[:, 2].tolist()
-            u_l = Al[:, 3].tolist()
-            lrs = lr_scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
-            metric["lrs"] = lrs
+            if "Als" in metrics:
+                alpha_l = Al[:, 1].tolist()
+                omega_l = Al[:, 2].tolist()
+                u_l = Al[:, 3].tolist()
+            else:
+                alpha_l, omega_l, u_l = None, None, None
+
+            if not fractal_mode: 
+                lrs = lr_scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
+            else:
+                lrs = None
+
+            if "lrs" in metrics:
+                metric["lrs"] = lrs
 
             logger.log(metric)
 

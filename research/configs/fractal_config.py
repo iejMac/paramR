@@ -164,7 +164,28 @@ def jascha_grid():
                 mf_cfg['cl'] = [c1, c2]
                 return mf_cfg
 
-            param_args = (training_frac, mlp1h, sgd_frac, mean_field_parametrization_with_diff_cl, jascha_data)
+            param_args = (training_frac, mlp1h, sgd_frac, const_lr_scheduler, mean_field_parametrization_with_diff_cl, jascha_data)
+
+            run_name = f"muP_c1_{c1:.14f}_c2_{c2:.14f}"
+            yield run_id, run_name, param_args
+
+
+def our_jascha_grid():
+    resolution = 16
+    dist = 0.7
+    muP_c1, muP_c2 = 0.0, 0.0
+    c1_grid = np.linspace(muP_c1 - dist, muP_c1 + dist, num=resolution).tolist()
+    c2_grid = np.linspace(muP_c2 - dist, muP_c2 + dist, num=resolution).tolist()
+
+    for c1_id, c1 in enumerate(c1_grid):
+        for c2_id, c2 in enumerate(c2_grid):
+            run_id = c1_id * len(c2_grid) + c2_id
+            def muP_with_diff_cl():
+                mf_cfg = mup_parametrization('sgd', 'full', 2)
+                mf_cfg['cl'] = [c1, c2]
+                return mf_cfg
+
+            param_args = (training_frac, mlp1h, sgd_frac, const_lr_scheduler, muP_with_diff_cl, jascha_data)
 
             run_name = f"mfp_c1_{c1:.14f}_c2_{c2:.14f}"
             yield run_id, run_name, param_args
@@ -282,7 +303,7 @@ def ab_grid(param_cfg, model_cfg, opt_cfg, data_cfg, l, resolution=5, ab_range=0
                 cfg['bl'][l - 1] = b
                 return cfg
 
-            param_args = (training_frac, model_cfg, opt_cfg, diff_ab, data_cfg)
+            param_args = (training_cifar, model_cfg, opt_cfg, diff_ab, data_cfg)
 
             run_name = f"grid_a{l}_{a:.2f}_b{l}_{b:.2f}"
             yield run_id, run_name, param_args
@@ -309,7 +330,7 @@ def ab_eps_grid(param_cfg, model_cfg, opt_cfg, data_cfg, l, resolution=5, t_reso
                     noisy_data_cfg["signal_strength"] = eps
                     return noisy_data_cfg
 
-                param_args = (training_frac, model_cfg, opt_cfg, diff_ab, ab_data_w_signal)
+                param_args = (training_cifar, model_cfg, opt_cfg, diff_ab, ab_data_w_signal)
                 run_name = f"grid_a{l}_{a:.2f}_b{l}_{b:.2f}_eps_{eps:.2f}"
                 yield run_id, run_name, param_args
 
@@ -335,7 +356,7 @@ def ab_lr_grid(param_cfg, model_cfg, opt_cfg, data_cfg, l, resolution=5, ab_rang
                     opt_config['lr'] = lr
                     return opt_config
 
-                param_args = (training_frac, model_cfg, opt_w_lr, diff_ab, data_cfg)
+                param_args = (training_cifar, model_cfg, opt_w_lr, diff_ab, data_cfg)
                 run_name = f"grid_a{l}_{a:.2f}_b{l}_{b:.2f}_lr_{lr:.6f}"
                 yield run_id, run_name, param_args
 
@@ -378,7 +399,7 @@ def depth_width_lr_grid(param_cfg, opt_cfg, lr_scheduler_cfg, data_cfg):
                 bl = param['bl']
                 lr_scheduler_cfg = ft.partial(lr_scheduler_cfg, n=w, al=al, bl=bl, lr_prefactor=lr)
 
-                param_args = (training_frac, mlp_lw_cifar, opt_w_lr, lr_scheduler_cfg, param_cfg_l, data_cfg)
+                param_args = (training_cifar, mlp_lw_cifar, opt_w_lr, lr_scheduler_cfg, param_cfg_l, data_cfg)
                 run_name = f"grid_depth_{l}_width_{w}_lr_{lr:.6f}"
                 yield run_id, run_name, param_args
 
@@ -533,7 +554,7 @@ def mup_adamw_lw_cos_noisy_cifar_grid_lr_schedule_ablation():
                 param_cfg=ft.partial(mup_parametrization, "adam", "full"),
                 opt_cfg=adamw_frac,
                 lr_scheduler_cfg=ft.partial(lr_scheduler),
-                data_cfg=cifar_noisy_data,
+                data_cfg=cifar_cos_noisy_data,
             ):
                 run_name += f"_{lr_scheduler.__name__}"
                 yield run_id, run_name, param_args
@@ -581,9 +602,21 @@ def ada_frac():
         },
     )
 
-def training_frac():
+def training_cifar():
     from fractal import train
     N_STEPS = 10000
+    return Config(
+        obj=train,
+        params={
+            "seed": 0,
+            "n_train_steps": N_STEPS,
+            "log_freq": 1,
+        },
+    )
+
+def training_frac():
+    from fractal import train
+    N_STEPS = 500
     return Config(
         obj=train,
         params={
