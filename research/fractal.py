@@ -80,7 +80,6 @@ def train(
                 trace[name] = {
                     "input": input[0][:log_sample_size].detach(),
                     "output": output[:log_sample_size].detach(),
-                    # "weight": model.weight.data.detach(),
                     "weight": model.lin.weight.data.detach(),
                 }
             return hook
