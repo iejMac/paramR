@@ -54,6 +54,7 @@ def train(
 
     param_cfg = parametrization_config()
     lr_scheduler = lr_scheduler_config().build(optimizer=opt)
+    alignment_warmup = 100  # how many steps before doing alignment-based LR schedules
 
     train_loader = data_config().build(device=device)
 
@@ -62,7 +63,7 @@ def train(
         "rLs": (1,),
     }
 
-    fractal_mode = True
+    fractal_mode = False
     if not fractal_mode:
         metrics.update({
             "Als": (model.n_layers, 4),  # A_cum, A_alpha, A_omega, A_u
@@ -79,7 +80,8 @@ def train(
                 trace[name] = {
                     "input": input[0][:log_sample_size].detach(),
                     "output": output[:log_sample_size].detach(),
-                    "weight": model.weight.data.detach(),
+                    # "weight": model.weight.data.detach(),
+                    "weight": model.lin.weight.data.detach(),
                 }
             return hook
         for l_id, l in enumerate(model.layers):
@@ -213,7 +215,9 @@ def train(
                 alpha_l, omega_l, u_l = None, None, None
 
             if not fractal_mode: 
-                lrs = lr_scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
+                lrs = [0.0] * len(alpha_l)  # TEMP: placeholder
+                if s > alignment_warmup:
+                    lrs = lr_scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
             else:
                 lrs = None
 

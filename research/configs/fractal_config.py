@@ -148,6 +148,7 @@ def jascha_data():
             "width": N_FRAC_1,
             "resample": False,
             "signal_strength": 0.0,
+            "label_init": "random",
         }
     )
 
@@ -171,8 +172,8 @@ def jascha_grid():
 
 
 def our_jascha_grid():
-    resolution = 16
-    dist = 0.7
+    resolution = 32
+    dist = 1.0 
     muP_c1, muP_c2 = 0.0, 0.0
     c1_grid = np.linspace(muP_c1 - dist, muP_c1 + dist, num=resolution).tolist()
     c2_grid = np.linspace(muP_c2 - dist, muP_c2 + dist, num=resolution).tolist()
@@ -362,16 +363,14 @@ def ab_lr_grid(param_cfg, model_cfg, opt_cfg, data_cfg, l, resolution=5, ab_rang
 
 
 def depth_width_lr_grid(param_cfg, opt_cfg, lr_scheduler_cfg, data_cfg):
-    # w_grid = [64, 256, 1024]
+    w_grid = [64, 256, 1024, 2048, 4096]
     # l_grid = [3, 5, 7]
-    # lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2]
-    w_grid = [1024, 2048]
-    l_grid = [7, 9]
+    l_grid = [3, 4]
 
     if opt_cfg == sgd_frac:
-        lr_grid = [2.0, 1.0, 5e-1, 3e-1, 1e-1, 5e-2, 3e-2]
+        lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2, 5e-3, 1e-3]
     elif opt_cfg == adamw_frac:
-        lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2, 5e-3]
+        lr_grid = [5e-1, 3e-1, 1e-1, 5e-2, 3e-2, 1e-2, 5e-3, 3e-4]
 
     for l_id, l in enumerate(l_grid):
         for w_id, w in enumerate(w_grid):
@@ -574,6 +573,33 @@ def mup_adamw_lw_very_noisy_cifar_grid_lr_schedule_ablation():
     return ablate_scheduler()
 
 
+def mup_adamw_lw_cifar_grid_lr_schedule_ablation_relu_w_alignment_warmup():
+    def ablate_scheduler():
+        for lr_scheduler in [const_lr_scheduler, max_lr_scheduler]:
+            for run_id, run_name, param_args in depth_width_lr_grid(
+                param_cfg=ft.partial(mup_parametrization, "adam", "full"),
+                opt_cfg=adamw_frac,
+                lr_scheduler_cfg=ft.partial(lr_scheduler),
+                data_cfg=cifar_data,
+            ):
+                run_name += f"_{lr_scheduler.__name__}"
+                yield run_id, run_name, param_args
+    return ablate_scheduler()
+
+def mup_sgd_lw_cifar_grid_lr_schedule_ablation_relu_w_alignment_warmup():
+    def ablate_scheduler():
+        for lr_scheduler in [const_lr_scheduler, max_lr_scheduler]:
+            for run_id, run_name, param_args in depth_width_lr_grid(
+                param_cfg=ft.partial(mup_parametrization, "sgd", "full"),
+                opt_cfg=sgd_frac,
+                lr_scheduler_cfg=ft.partial(lr_scheduler),
+                data_cfg=cifar_data,
+            ):
+                run_name += f"_{lr_scheduler.__name__}"
+                yield run_id, run_name, param_args
+    return ablate_scheduler()
+
+
 # Common:
 def sgd_frac():
     from torch.optim import SGD
@@ -604,11 +630,11 @@ def ada_frac():
 
 def training_cifar():
     from fractal import train
-    N_STEPS = 10000
+    N_STEPS = 5000
     return Config(
         obj=train,
         params={
-            "seed": 0,
+            "seed": 2,
             "n_train_steps": N_STEPS,
             "log_freq": 1,
         },

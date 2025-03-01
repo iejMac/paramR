@@ -65,7 +65,7 @@ class CIFAR10Dataset(NoisyDataset):
 class SyntheticNormalDataset(NoisyDataset):
     def __init__(
             self, dataset_size, batch_size, width, device="cpu", resample=True,
-            signal_fn='const', signal_strength=1.0, signal_range=1.0, signal_period=1000, total_steps=1000
+            signal_fn='const', signal_strength=1.0, signal_range=1.0, signal_period=1000, total_steps=1000, label_init="linear"
     ):
         super().__init__(device, signal_fn, signal_strength, signal_range, signal_period, total_steps)
         self.batch_size = batch_size
@@ -79,8 +79,11 @@ class SyntheticNormalDataset(NoisyDataset):
         self.X = torch.randn(self.dataset_size, width).to(device)
 
         # Create a linear relationship for labels.
-        true_weights = torch.randn(width, 1).to(device)
-        self.Y = self.X @ true_weights
+        if label_init == "linear":
+            true_weights = torch.randn(width, 1).to(device)
+            self.Y = self.X @ true_weights
+        else: # random
+            self.Y = torch.randn_like(self.X)
 
     def __iter__(self):
         while True:

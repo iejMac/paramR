@@ -540,7 +540,7 @@ class GridVisualizer:
 
 def main():
     # Collect runs from both experiments
-    prefix = "adamw_cos_noisy"
+    prefix = "sgd_relu_align_warmup_"
 
     exps = {}
 
@@ -553,24 +553,6 @@ def main():
     # exps["sgd_const"] = sgd_constant_collector
     # exps["sgd_max"] = sgd_max_collector
 
-    # sgd_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_noisy_cifar_grid_lr_schedule_ablation"
-    # sgd_noisy_exp_collector = RunCollector(sgd_noisy_exp_dir)
-    # sgd_noisy_exp_collector = sgd_noisy_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
-
-    # sgd_noisy_constant_collector = sgd_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
-    # sgd_noisy_max_collector = sgd_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
-    # exps["sgd_noisy_const"] = sgd_noisy_constant_collector
-    # exps["sgd_noisy_max"] = sgd_noisy_max_collector
-
-    # sgd_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_noisy_cifar_grid_lr_schedule_ablation"
-    # sgd_noisy_exp_collector = RunCollector(sgd_noisy_exp_dir)
-    # sgd_noisy_exp_collector = sgd_noisy_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
-
-    # sgd_noisy_constant_collector = sgd_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
-    # sgd_noisy_max_collector = sgd_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
-    # exps["sgd_noisy_const"] = sgd_noisy_constant_collector
-    # exps["sgd_noisy_max"] = sgd_noisy_max_collector
-
     # adamw_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_cifar_grid_lr_schedule_ablation"
     # adamw_exp_collector = RunCollector(adamw_exp_dir)
     # adamw_exp_collector = adamw_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
@@ -580,33 +562,32 @@ def main():
     # exps["adamw_const"] = adamw_constant_collector
     # exps["adamw_max"] = adamw_max_collector
 
-    # adamw_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_noisy_cifar_grid_lr_schedule_ablation"
-    # adamw_noisy_exp_collector = RunCollector(adamw_noisy_exp_dir)
-    # adamw_noisy_exp_collector = adamw_noisy_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
+    # adamw_relu_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_cifar_grid_lr_schedule_ablation_relu"
+    # adamw_relu_exp_collector = RunCollector(adamw_relu_exp_dir)
+    # # adamw_relu_exp_collector = adamw_relu_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
 
-    # adamw_noisy_constant_collector = adamw_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
-    # adamw_noisy_max_collector = adamw_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
-    # exps["adamw_noisy_const"] = adamw_noisy_constant_collector
-    # exps["adamw_noisy_max"] = adamw_noisy_max_collector
+    # adamw_relu_constant_collector = adamw_relu_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    # adamw_relu_max_collector = adamw_relu_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    # exps["adamw_relu_const"] = adamw_relu_constant_collector
+    # exps["adamw_relu_max"] = adamw_relu_max_collector
 
-    # adamw_very_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_very_noisy_cifar_grid_lr_schedule_ablation"
-    # adamw_very_noisy_exp_collector = RunCollector(adamw_very_noisy_exp_dir)
-    # adamw_very_noisy_exp_collector = adamw_very_noisy_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
+    # adamw_relu_align_warmup_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_cifar_grid_lr_schedule_ablation_relu_w_alignment_warmup"
+    # adamw_relu_align_warmup_exp_collector = RunCollector(adamw_relu_align_warmup_exp_dir)
+    # # adamw_relu_align_warmup_exp_collector = adamw_relu_align_warmup_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
 
-    # adamw_very_noisy_constant_collector = adamw_very_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
-    # adamw_very_noisy_max_collector = adamw_very_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
-    # exps["adamw_very_noisy_const"] = adamw_very_noisy_constant_collector
-    # exps["adamw_very_noisy_max"] = adamw_very_noisy_max_collector
+    # adamw_relu_align_warmup_constant_collector = adamw_relu_align_warmup_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    # adamw_relu_align_warmup_max_collector = adamw_relu_align_warmup_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    # exps["adamw_relu_align_warmup_const"] = adamw_relu_align_warmup_constant_collector
+    # exps["adamw_relu_align_warmup_max"] = adamw_relu_align_warmup_max_collector
 
-    adamw_cos_noisy_exp_dir = "/home/maciej/code/paramR/runs/mup_adamw_lw_cos_noisy_cifar_grid_lr_schedule_ablation"
-    adamw_cos_noisy_exp_collector = RunCollector(adamw_cos_noisy_exp_dir)
-    adamw_cos_noisy_exp_collector = adamw_cos_noisy_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
+    sgd_relu_align_warmup_exp_dir = "/home/maciej/code/paramR/runs/mup_sgd_lw_cifar_grid_lr_schedule_ablation_relu_w_alignment_warmup"
+    sgd_relu_align_warmup_exp_collector = RunCollector(sgd_relu_align_warmup_exp_dir)
+    # sgd_relu_align_warmup_exp_collector = sgd_relu_align_warmup_exp_collector.filter(lambda run: (run.model_config["params"]["dims"][1] >= 1024) & (len(run.model_config["params"]["dims"]) >= 7 + 1))
 
-    adamw_cos_noisy_constant_collector = adamw_cos_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
-    adamw_cos_noisy_max_collector = adamw_cos_noisy_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
-    exps["adamw_cos_noisy_const"] = adamw_cos_noisy_constant_collector
-    exps["adamw_cos_noisy_max"] = adamw_cos_noisy_max_collector
-
+    sgd_relu_align_warmup_constant_collector = sgd_relu_align_warmup_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'constant_lr_scheduler')
+    sgd_relu_align_warmup_max_collector = sgd_relu_align_warmup_exp_collector.filter(lambda run: run.lr_scheduler_config['obj'] == 'maximal_lr_scheduler')
+    exps["sgd_relu_align_warmup_const"] = sgd_relu_align_warmup_constant_collector
+    exps["sgd_relu_align_warmup_max"] = sgd_relu_align_warmup_max_collector
 
     # Load and group runs
     def group_by_architecture(run: RunData) -> Dict[str, Any]:

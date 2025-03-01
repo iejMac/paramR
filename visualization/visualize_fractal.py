@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(mess
 # Parameters
 runs_dir = "/home/maciej/code/paramR/runs/our_jascha_grid"
 visualizations_dir = "./"
-exp_name = "testing_high_signal_randY"
+exp_name = "testing"
 output_image = os.path.join(visualizations_dir, f"{exp_name}.png")
 output_array = os.path.join(visualizations_dir, f"{exp_name}.npy")
 max_val = 1e6

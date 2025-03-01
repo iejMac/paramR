@@ -27,7 +27,7 @@ def unstable_parametrization(mlp, lr_prefactor=0.1, std_prefactor=2**0.5):
         lr_scale = n ** -c
 
         lr_scale_groups[lr_scale] = lr_scale_groups.get(lr_scale, []) + [layer.weight]
-        mlp.layer_multipliers[i] = l_mult
+        mlp.layers[i].layer_multiplier = l_mult
         torch.nn.init.normal_(layer.weight, mean=0.0, std=std_prefactor * (var_l ** 0.5))
     optim_groups = [{'params': params, 'lr': lr_prefactor * lr_scale} for lr_scale, params in lr_scale_groups.items()]
     return optim_groups
@@ -53,7 +53,7 @@ def standard_parametrization(mlp, lr_prefactor=0.1, std_prefactor=2**0.5):
         lr_scale = n ** -c
 
         lr_scale_groups[lr_scale] = lr_scale_groups.get(lr_scale, []) + [layer.weight]
-        mlp.layer_multipliers[i] = l_mult
+        mlp.layers[i].layer_multiplier = l_mult
         torch.nn.init.normal_(layer.weight, mean=0.0, std=std_prefactor * (var_l ** 0.5))
     optim_groups = [{'params': params, 'lr': lr_prefactor * lr_scale} for lr_scale, params in lr_scale_groups.items()]
     return optim_groups
@@ -79,26 +79,11 @@ def mu_parametrization(mlp, lr_prefactor=0.1, std_prefactor=2**0.5):
         lr_scale = n ** -c
 
         lr_scale_groups[lr_scale] = lr_scale_groups.get(lr_scale, []) + [layer.weight]
-        mlp.layer_multipliers[i] = l_mult
+        mlp.layers[i].layer_multiplier = l_mult
         torch.nn.init.normal_(layer.weight, mean=0.0, std=std_prefactor * (var_l ** 0.5))
     optim_groups = [{'params': params, 'lr': lr_prefactor * lr_scale} for lr_scale, params in lr_scale_groups.items()]
     return optim_groups
 
-
-# def abc_parametrization(mlp, n, al, bl, cl, lr_prefactor=0.1, std_prefactor=2**0.5):
-#     lr_scale_groups = {}
-#     for i, layer in enumerate(mlp.layers):
-#         a, b, c = al[i], bl[i], cl[i]
-# 
-#         l_mult = n ** -a
-#         var_l = n ** (-2*b)
-#         lr_scale = n ** -c
-# 
-#         lr_scale_groups[lr_scale] = lr_scale_groups.get(lr_scale, []) + [layer.weight]
-#         mlp.layer_multipliers[i] = l_mult
-#         torch.nn.init.normal_(layer.weight, mean=0.0, std=std_prefactor * (var_l ** 0.5))
-#     optim_groups = [{'params': params, 'lr': lr_prefactor * lr_scale} for lr_scale, params in lr_scale_groups.items()]
-#     return optim_groups
 
 # new group for each param (so dynamic setting is easier)
 def abc_parametrization(mlp, n, al, bl, cl, lr_prefactor=0.1, std_prefactor=2**0.5):
@@ -110,10 +95,9 @@ def abc_parametrization(mlp, n, al, bl, cl, lr_prefactor=0.1, std_prefactor=2**0
         var_l = n ** (-2*b)
         lr_scale = n ** -c
 
-        # lr_scale_groups[lr_scale] = lr_scale_groups.get(lr_scale, []) + [layer.weight]
-        lr_scale_groups.append((lr_scale, layer.weight))
-        mlp.layer_multipliers[i] = l_mult
-        torch.nn.init.normal_(layer.weight, mean=0.0, std=std_prefactor * (var_l ** 0.5))
+        lr_scale_groups.append((lr_scale, layer.lin.weight))
+        mlp.layers[i].layer_multiplier = l_mult
+        torch.nn.init.normal_(layer.lin.weight, mean=0.0, std=std_prefactor * (var_l ** 0.5))
     optim_groups = [{'params': params, 'lr': lr_prefactor * lr_scale} for lr_scale, params in lr_scale_groups]
     return optim_groups
 
