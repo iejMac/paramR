@@ -19,13 +19,134 @@ def mlp_2h_with_dims(in_dim: int, width: int, out_dim: int):
     return Config(obj=MLP, params={"dims": dims, "bias": False})
 
 
-def mup_parametrization(n_layers: int = DEPTH_LAYERS):
+# def mup_parametrization(n_layers: int = DEPTH_LAYERS):
+#     from parametrization import abc_parametrization
+#     # simple muP-like exponents
+#     al = [-0.5] + [0.0] * (n_layers - 2) + [0.5]
+#     bl = [0.5]  + [0.5] * (n_layers - 2) + [0.5]
+#     cl = [0.0]  + [0.0] * (n_layers - 2) + [0.0]
+#     return Config(obj=abc_parametrization, params={"al": al, "bl": bl, "cl": cl})
+
+
+def mup_parametrization(opt, alignment, n_layers):
     from parametrization import abc_parametrization
-    # simple muP-like exponents
-    al = [-0.5] + [0.0] * (n_layers - 2) + [0.5]
-    bl = [0.5]  + [0.5] * (n_layers - 2) + [0.5]
-    cl = [0.0]  + [0.0] * (n_layers - 2) + [0.0]
-    return Config(obj=abc_parametrization, params={"al": al, "bl": bl, "cl": cl})
+
+    al = [-0.5] +  [0.0] * (n_layers - 2) +  [0.5]
+    bl =  [0.5] +  [0.5] * (n_layers - 2) +  [0.5]
+
+    if alignment == 'full':
+        if opt == 'sgd':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+        elif opt == 'adam':
+            cl =  [0.5] +  [1.0] * (n_layers - 2) +  [0.5]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.0]
+    elif alignment == 'no':
+        if opt == 'sgd':
+            cl =  [0.0] + [-0.5] * (n_layers - 2) +  [0.0]
+        elif opt == 'adam':
+            cl =  [0.5] +  [0.5] * (n_layers - 2) +  [0.0]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    return Config(
+        obj=abc_parametrization,
+        params={
+            "al": al,
+            "bl": bl,
+            "cl": cl,
+        }
+    )
+
+def ntk_parametrization(opt, alignment, n_layers):
+    from parametrization import abc_parametrization
+
+    al =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+    bl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    if alignment == 'full':
+        if opt == 'sgd':
+            cl = [-0.5] + [-0.5] * (n_layers - 2) +  [0.0]
+        elif opt == 'adam':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+    elif alignment == 'no':
+        if opt == 'sgd':
+            cl = [-0.5] + [-1.0] * (n_layers - 2) + [-0.5]
+        elif opt == 'adam':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    return Config(
+        obj=abc_parametrization,
+        params={
+            "al": al,
+            "bl": bl,
+            "cl": cl,
+        }
+    )
+
+def mfp_parametrization(opt, alignment, n_layers):
+    from parametrization import abc_parametrization
+
+    al =  [0.0] +  [0.5] * (n_layers - 2) +  [1.0]
+    bl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    if alignment == 'full':
+        if opt == 'sgd':
+            cl = [-1.0] + [-1.0] * (n_layers - 2) + [-1.0]
+        elif opt == 'adam':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.0]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.0]
+    elif alignment == 'no':
+        if opt == 'sgd':
+            cl = [-1.0] + [-1.5] * (n_layers - 2) + [-1.0]
+        elif opt == 'adam':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.5]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    return Config(
+        obj=abc_parametrization,
+        params={
+            "al": al,
+            "bl": bl,
+            "cl": cl,
+        }
+    )
+
+def standard_parametrization(opt, alignment, n_layers):
+    from parametrization import abc_parametrization
+
+    al =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+    bl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+
+    if alignment == 'full':
+        if opt == 'sgd':
+            cl = [-0.5] +  [0.5] * (n_layers - 2) +  [1.0]
+        elif opt == 'adam':
+            cl =  [0.0] +  [1.0] * (n_layers - 2) +  [1.0]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+    elif alignment == 'no':
+        if opt == 'sgd':
+            cl = [-0.5] +  [0.0] * (n_layers - 2) +  [0.5]
+        elif opt == 'adam':
+            cl =  [0.0] +  [0.5] * (n_layers - 2) +  [0.5]
+        elif opt == 'ada':
+            cl =  [0.0] +  [0.0] * (n_layers - 2) +  [0.0]
+
+    return Config(
+        obj=abc_parametrization,
+        params={
+            "al": al,
+            "bl": bl,
+            "cl": cl,
+        }
+    )
 
 
 def sgd(lr: float):
@@ -49,8 +170,10 @@ def training_small(n_steps: int = 1000, seed: int = 0, log_freq: int = 1):
 
 
 def metrics_alignment_and_rL():
-    # .build() returns the spec list consumed by train.py
     return Config(obj=lambda spec: spec, params={"spec": ["alignment", "rL"]})
+
+def metrics_none():
+    return Config(obj=lambda spec: spec, params={"spec": []})
 
 
 # ----------------------------
@@ -96,7 +219,7 @@ def cifar10_data(batch_size=256, **noise_kwargs):
 # ----------------------------
 def width_lr_grid(
     widths=(32, 64, 128),
-    lrs=(1e0, 6e-1, 3e-1),
+    lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
     optimizer="sgd",                 # "sgd" or "adamw"
     dataset="synth",                 # "synth" or "cifar"
 ):
@@ -149,7 +272,8 @@ def width_lr_grid(
 
             # Parametrization sized to depth
             def param_cfg(n_layers=DEPTH_LAYERS):
-                return mup_parametrization(n_layers)
+                # return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
+                return standard_parametrization("sgd", alignment="full", n_layers=n_layers)
 
             # LR scheduler
             def lr_sched_cfg():
@@ -160,7 +284,7 @@ def width_lr_grid(
                 return training_small(n_steps=1000, seed=0, log_freq=1)
 
             def metrics_cfg():
-                return metrics_alignment_and_rL()
+                return metrics_none()
 
             run_name = f"{ds_tag}_w{w}_lr{lr:.3g}_{optimizer}"
             param_args = (training_cfg, model_cfg, opt_cfg, lr_sched_cfg, param_cfg, data_cfg, metrics_cfg)
