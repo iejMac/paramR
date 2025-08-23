@@ -172,7 +172,7 @@ def jascha_grid():
 
 
 def our_jascha_grid():
-    resolution = 32
+    resolution = 4
     dist = 1.0 
     muP_c1, muP_c2 = 0.0, 0.0
     c1_grid = np.linspace(muP_c1 - dist, muP_c1 + dist, num=resolution).tolist()
@@ -629,7 +629,7 @@ def ada_frac():
     )
 
 def training_cifar():
-    from fractal import train
+    from train import train
     N_STEPS = 5000
     return Config(
         obj=train,
@@ -641,7 +641,7 @@ def training_cifar():
     )
 
 def training_frac():
-    from fractal import train
+    from train import train
     N_STEPS = 500
     return Config(
         obj=train,
