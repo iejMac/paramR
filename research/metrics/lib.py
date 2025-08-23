@@ -1,7 +1,8 @@
 # metrics.py
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Dict, Tuple, List, Callable, Any
+from typing import Dict, Tuple, List, Any, Union
+
 
 import numpy as np
 import torch
@@ -19,13 +20,37 @@ def register(metric_cls):
     _REGISTRY[metric_cls.name] = metric_cls  # type: ignore
     return metric_cls
 
-def build_metric_set(names_and_kwargs: List[Tuple[str, Dict[str, Any]]]) -> List["Metric"]:
-    out: List[Metric] = []
-    for name, kwargs in names_and_kwargs:
+SpecItem = Union[str, Tuple[str, Dict[str, Any]], Dict[str, Any]]
+
+def build_metric_set(spec: List[SpecItem]) -> List["Metric"]:
+    """
+    Flexible spec:
+      ["alignment", "rL"]
+      [("alignment", {"foo": 1}), ("rL", {})]
+      [{"name": "alignment"}, {"name": "rL", "kwargs": {"foo": 1}}]
+    """
+    items: List[Tuple[str, Dict[str, Any]]] = []
+    for it in spec:
+        if isinstance(it, str):
+            items.append((it, {}))
+        elif isinstance(it, tuple) and len(it) == 2:
+            name, kwargs = it
+            items.append((name, dict(kwargs or {})))
+        elif isinstance(it, dict):
+            name = it.get("name")
+            if not name:
+                raise ValueError(f"Metric spec dict missing 'name': {it}")
+            items.append((name, dict(it.get("kwargs", {}) or {})))
+        else:
+            raise ValueError(f"Unrecognized metric spec entry: {it!r}")
+
+    out: List["Metric"] = []
+    for name, kwargs in items:
         if name not in _REGISTRY:
             raise KeyError(f"Unknown metric '{name}'. Available: {list(_REGISTRY)}")
         out.append(_REGISTRY[name](**kwargs))
     return out
+
 
 def schema_from_metrics(metrics: List["Metric"], window: TraceWindow) -> Schema:
     schema: Schema = {}

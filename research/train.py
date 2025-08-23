@@ -1,5 +1,4 @@
 # train.py
-import copy
 import json
 import os
 import sys
@@ -17,16 +16,17 @@ torch.set_default_dtype(torch.float64)
 
 
 def train(
-        model_config, optimizer_config, parametrization_config, lr_scheduler_config, data_config,
-        n_train_steps,
-        log_freq,
-        seed=0,
-        run_dir="./runs", data_dir="./data",
-    ):
+    model_config, optimizer_config, parametrization_config, lr_scheduler_config, data_config,
+    n_train_steps,
+    log_freq,
+    seed=0,
+    run_dir="./runs", data_dir="./data",
+    metrics_config=None,  # <- just another config, like the others
+):
     torch.manual_seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Build model/optimizer/params
+    # --- Build model/optimizer/params
     model = model_config().build().to(device)
     opt_cfg = optimizer_config()
 
@@ -37,31 +37,27 @@ def train(
     lr_scheduler = lr_scheduler_config().build(optimizer=opt)
     alignment_warmup = 100
 
-    # Data
+    # --- Data
     train_loader = data_config().build(device=device)
 
-    # ----- Stage 1: minimal linear tracer -----
+    # --- Tracer
     tracer = Tracer(model, sample_size=32)
     measurement_X, _ = next(iter(train_loader))
     tracer.capture_initial(measurement_X)
 
-    # ----- Stage 2: metrics library -----
-    metric_set = build_metric_set([
-        ("alignment", {}),  # -> "Als": (n_layers, 4)
-        ("rL", {}),         # -> "rLs": (1,)
-    ])
+    # --- Metrics
+    metrics_spec = metrics_config().build() if metrics_config is not None else ["alignment", "rL"]
+    metric_set = build_metric_set(metrics_spec)
 
-    # Prepare logger schema
+    # --- Logger schema
     current0 = tracer.capture(step=0, measurement_X=measurement_X)
     window0 = tracer.window(current0)
-    base_schema = {
-        "losses": (1,),
-        "lrs": (window0.n_layers,),
-    }
-    schema = {**base_schema, **schema_from_metrics(metric_set, window0)}
+    base_schema = {"losses": (1,), "lrs": (window0.n_layers,)}
+    extra_schema = schema_from_metrics(metric_set, window0) if metric_set else {}
+    schema = {**base_schema, **extra_schema}
     logger = BinaryLogger(run_dir, n_steps=n_train_steps, metrics=schema)
 
-    # ----- Train loop -----
+    # --- Train loop
     s = 0
     diverged = False
     for X, y in train_loader:
@@ -69,9 +65,8 @@ def train(
             break
 
         opt.zero_grad()
-
-        # Forward on training batch (no tracing needed)
         y_hat = model(X)
+
         if train_loader.type == "classification":
             loss = F.cross_entropy(y_hat, y)
         elif train_loader.type == "regression":
@@ -87,26 +82,33 @@ def train(
 
         metric_row = {"step": s, "losses": loss_item}
 
-        # Compute metrics BEFORE backward/step (like your original logic)
+        # Compute metrics BEFORE backward/step
         if s % log_freq == 0:
             with torch.no_grad():
                 current = tracer.capture(step=s, measurement_X=measurement_X)
                 window = tracer.window(current)
-                mvals = compute_all(metric_set, window)
-                metric_row.update(mvals)
 
-                # LR scheduling using alignment components if desired
+                if metric_set:
+                    mvals = compute_all(metric_set, window)
+                    metric_row.update(mvals)
+                else:
+                    mvals = {}
+
+                # LR scheduling using alignment if present
                 lrs = [0.0] * window.n_layers
                 if "Als" in mvals:
                     Al = mvals["Als"]  # [L, 4]
                     alpha_l = Al[:, 1].tolist()
                     omega_l = Al[:, 2].tolist()
-                    u_l = Al[:, 3].tolist()
+                    u_l     = Al[:, 3].tolist()
                 else:
                     alpha_l = omega_l = u_l = None
 
                 if s > alignment_warmup:
-                    lrs = lr_scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
+                    try:
+                        lrs = lr_scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
+                    except TypeError:
+                        lrs = [0.0] * window.n_layers
 
                 metric_row["lrs"] = lrs
 
@@ -114,20 +116,20 @@ def train(
 
         # Backprop + step
         loss.backward()
-        tracer.collect_weight_grads_after_backward()  # grad_weight available on next measurement
+        tracer.collect_weight_grads_after_backward()  # grad_weight captured for next measurement
         opt.step()
-        tracer.on_optimizer_step()                    # update_weight available on next measurement
+        tracer.on_optimizer_step()                    # update_weight captured for next measurement
 
         s += 1
 
     logger.save()
 
 
-def main(run_name, exp_name, training_config, model_config, optimizer_config, lr_scheduler_config, parametrization_config, data_config):
+def main(run_name, exp_name, training_config, model_config, optimizer_config, lr_scheduler_config, parametrization_config, data_config, metrics_config=None):
     run_dir = os.path.join("./runs", exp_name, run_name)
     os.makedirs(run_dir, exist_ok=True)
 
-    # Save configs
+    # Save configs (metrics saved like the rest)
     configs = {
         "training": training_config,
         "model": model_config,
@@ -136,18 +138,22 @@ def main(run_name, exp_name, training_config, model_config, optimizer_config, lr
         "parametrization": parametrization_config,
         "data": data_config,
     }
+    if metrics_config is not None:
+        configs["metrics"] = metrics_config
+
     for config_name, config in configs.items():
         config_path = os.path.join(run_dir, f"{config_name}_config.json")
         with open(config_path, "w") as f:
             json.dump(config().get_params(), f, indent=4)
 
-    # Kick off training via the training config (as in your original setup)
+    # Kick off training via the training config
     training_config().build(
         model_config=model_config,
         optimizer_config=optimizer_config,
         lr_scheduler_config=lr_scheduler_config,
         parametrization_config=parametrization_config,
         data_config=data_config,
+        metrics_config=metrics_config,
         run_dir=run_dir,
     )
 
@@ -156,7 +162,7 @@ if __name__ == "__main__":
     worker_id = int(os.environ.get("WORKER_ID", 0))
     n_workers = int(os.environ.get("N_WORKERS", 1))
 
-    import configs.lib  # keep your existing grid launcher behavior
+    import configs.lib
     exp_name = sys.argv[1]
     grid = getattr(configs.lib, exp_name)
 
