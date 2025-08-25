@@ -250,7 +250,8 @@ def width_lr_grid(
         base_out_dim = CIFAR_NUM_CLASSES
 
         def data_cfg_factory(_dims):
-            return cifar10_data(batch_size=256, signal_fn="const", signal_strength=1.0, signal_period=1000, total_steps=1000)
+            # return cifar10_data(batch_size=256, signal_fn="const", signal_strength=1.0, signal_period=1000, total_steps=1000)
+            return cifar10_data(batch_size=256, signal_fn="const", signal_strength=0.6, signal_period=1000, total_steps=1000)
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -272,8 +273,8 @@ def width_lr_grid(
 
             # Parametrization sized to depth
             def param_cfg(n_layers=DEPTH_LAYERS):
-                # return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
-                return standard_parametrization("sgd", alignment="full", n_layers=n_layers)
+                # return standard_parametrization("sgd", alignment="full", n_layers=n_layers)
+                return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
 
             # LR scheduler
             def lr_sched_cfg():
@@ -281,10 +282,11 @@ def width_lr_grid(
 
             # Training & Metrics
             def training_cfg():
-                return training_small(n_steps=1000, seed=0, log_freq=1)
+                return training_small(n_steps=1000, seed=0, log_freq=10)
 
             def metrics_cfg():
-                return metrics_none()
+                # return metrics_none()
+                return metrics_alignment_and_rL()
 
             run_name = f"{ds_tag}_w{w}_lr{lr:.3g}_{optimizer}"
             param_args = (training_cfg, model_cfg, opt_cfg, lr_sched_cfg, param_cfg, data_cfg, metrics_cfg)
@@ -299,3 +301,9 @@ def width_lr_grid_synth(**kwargs):
 
 def width_lr_grid_cifar(**kwargs):
     return width_lr_grid(dataset="cifar", **kwargs)
+
+def cifar_single(**kwargs):
+    return width_lr_grid(widths=(512,), lrs=(2e-1,), optimizer="sgd", dataset="cifar")
+def cifar_single_more_noise(**kwargs):
+    return width_lr_grid(widths=(512,), lrs=(2e-1,), optimizer="sgd", dataset="cifar")
+

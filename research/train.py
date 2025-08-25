@@ -18,10 +18,10 @@ torch.set_default_dtype(torch.float64)
 def train(
     model_config, optimizer_config, parametrization_config, lr_scheduler_config, data_config,
     n_train_steps,
-    log_freq,
+    log_freq=1,
     seed=0,
-    run_dir="./runs", data_dir="./data",
-    metrics_config=None,  # <- just another config, like the others
+    run_dir="./runs",
+    metrics_config=None,
 ):
     torch.manual_seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

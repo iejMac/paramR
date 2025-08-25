@@ -9,7 +9,8 @@ class BinaryLogger:
         self.metrics = {}
         for m_name, m_shape in metrics.items():
             m_full_shape = (n_steps,) + m_shape
-            self.metrics[m_name] = np.zeros(m_full_shape, dtype=np.float64)
+            # Initialize with NaNs so unlogged steps are clearly marked as missing
+            self.metrics[m_name] = np.full(m_full_shape, np.nan, dtype=np.float64)
    
     def log(self, metric):
         step = metric.pop("step")

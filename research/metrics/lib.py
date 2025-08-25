@@ -77,9 +77,23 @@ class Metric:
 
 # ---------- helpers ----------
 
-def _rms_norm(x: torch.Tensor) -> torch.Tensor:
+def _rms_norm(x: torch.Tensor, dim: int=None) -> torch.Tensor:
     # robust RMS (avoid underflow for tiny tensors)
-    return torch.sqrt(torch.mean(x.double() ** 2) + 1e-32)
+    x = x.double()
+    if dim is None:
+        return torch.sqrt(torch.mean(x ** 2) + 1e-32)
+    return torch.sqrt(torch.mean(x ** 2, dim=dim) + 1e-32)
+
+def _l2_norm(x: torch.Tensor, dim: int=None) -> torch.Tensor:
+    # robust RMS (avoid underflow for tiny tensors)
+    x = x.double()
+    if dim is None:
+        return torch.sqrt(torch.sum(x ** 2) + 1e-32)
+    return torch.sqrt(torch.sum(x ** 2, dim=dim) + 1e-32)
+
+def _spectral_norm(x: torch.Tensor) -> torch.Tensor:
+    return torch.linalg.norm(x, 2)
+
 
 def _cpu(x: torch.Tensor) -> np.ndarray:
     return x.detach().to("cpu").contiguous().numpy()
@@ -143,41 +157,64 @@ class Alignment(Metric):
             assert z is not None and w is not None and o is not None
             assert z0 is not None and w0 is not None
 
-            z_n  = _rms_norm(z)
-            w_n  = _rms_norm(w)
-            o_n  = _rms_norm(o)
-            z0_n = _rms_norm(z0)
-            w0_n = _rms_norm(w0)
+            # z_n  = _rms_norm(z, dim=-1)
+            z_n  = _l2_norm(z, dim=-1)
+
+            # w_n  = _rms_norm(w)
+            w_n  = _spectral_norm(w)
+
+            # o_n  = _rms_norm(o, dim=-1)
+            o_n  = _l2_norm(o, dim=-1)
+
+            # z0_n = _rms_norm(z0, dim=-1)
+            z0_n = _l2_norm(z0, dim=-1)
+
+            # w0_n = _rms_norm(w0)
+            w0_n = _spectral_norm(w0)
 
             dz   = (z - z0)
             dw   = (w - w0)
-            dz_n = _rms_norm(dz)
-            dw_n = _rms_norm(dw)
+
+            # dz_n = _rms_norm(dz, dim=-1)
+            dz_n = _l2_norm(dz, dim=-1)
+
+            # dw_n = _rms_norm(dw)
+            dw_n = _spectral_norm(dw)
 
             # I. cumulative alignment
-            A_cum = (torch.log(o_n) - torch.log(z_n * w_n)) / torch.log(torch.tensor(width, dtype=torch.float64))
+            # A_cum = (torch.log(o_n) - torch.log(z_n * w_n)) / torch.log(torch.tensor(width, dtype=torch.float64))
+            A_cum = torch.mean(o_n / (z_n * w_n))
 
             # Initialize others
             A_alpha = torch.tensor(0.0, dtype=torch.float64)
             A_omega = torch.tensor(0.0, dtype=torch.float64)
             A_u     = torch.tensor(0.0, dtype=torch.float64)
 
-            if float(dw_n + dz_n) != 0.0:
+            if float((dw_n + dz_n).sum()) != 0.0:
                 # II. alpha alignment: o = z0 @ dw^T
                 o_alpha = z0 @ dw.T
-                o_alpha_n = _rms_norm(o_alpha)
-                A_alpha = (torch.log(o_alpha_n) - torch.log(z0_n * dw_n)) / torch.log(torch.tensor(width, dtype=torch.float64))
+                # o_alpha_n = _rms_norm(o_alpha, dim=-1)
+                o_alpha_n = _l2_norm(o_alpha, dim=-1)
+
+                # A_alpha = (torch.log(o_alpha_n) - torch.log(z0_n * dw_n)) / torch.log(torch.tensor(width, dtype=torch.float64))
+                A_alpha = torch.mean(o_alpha_n / (z0_n * dw_n))
 
                 if idx > 0:  # by definition z=x at l=0 => dz=0
                     # III. omega alignment: o = dz @ w0^T
                     o_omega = dz @ w0.T
-                    o_omega_n = _rms_norm(o_omega)
-                    A_omega = (torch.log(o_omega_n) - torch.log(dz_n * w0_n)) / torch.log(torch.tensor(width, dtype=torch.float64))
+                    # o_omega_n = _rms_norm(o_omega, dim=-1)
+                    o_omega_n = _l2_norm(o_omega, dim=-1)
+
+                    # A_omega = (torch.log(o_omega_n) - torch.log(dz_n * w0_n)) / torch.log(torch.tensor(width, dtype=torch.float64))
+                    A_omega = torch.mean(o_omega_n / (dz_n * w0_n))
 
                     # IV. u alignment: o = dz @ dw^T
                     o_u = dz @ dw.T
-                    o_u_n = _rms_norm(o_u)
-                    A_u = (torch.log(o_u_n) - torch.log(dz_n * dw_n)) / torch.log(torch.tensor(width, dtype=torch.float64))
+                    # o_u_n = _rms_norm(o_u, dim=-1)
+                    o_u_n = _l2_norm(o_u, dim=-1)
+
+                    # A_u = (torch.log(o_u_n) - torch.log(dz_n * dw_n)) / torch.log(torch.tensor(width, dtype=torch.float64))
+                    A_u = torch.mean(o_u_n / (dz_n * dw_n))
                 else:
                     A_omega = torch.tensor(-float("inf") if window.current.step > 0 else 0.0, dtype=torch.float64)
                     A_u     = A_omega.clone()
