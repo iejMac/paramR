@@ -1,129 +1,160 @@
-import os
-import csv
-import datetime
+# train.py
 import json
+import os
+import sys
+import time
 
+import numpy as np
 import torch
 import torch.nn.functional as F
-import numpy as np
 
-from configs.cifar_config import mlp_base, adamw_base, sgd_base, training_base
-from data import CIFAR10Dataset
+from logger import BinaryLogger
+from metrics.tracing import Tracer
+from metrics.lib import build_metric_set, schema_from_metrics, compute_all
 
-from parametrization import standard_parametrization, mu_parametrization
-
-
-class CSVLogger:
-    def __init__(self, fieldnames=None, log_dir="./logs", overwrite=True):
-        os.makedirs(log_dir, exist_ok=True)
-        self.file = open(os.path.join(log_dir, f"{'metrics' if overwrite else datetime.datetime.now().strftime('metrics_%Y%m%d_%H%M%S')}.csv"), 'w', newline='')
-        self.writer = csv.DictWriter(self.file, fieldnames=fieldnames)
-        self.writer.writeheader()
-
-    def log(self, step, **metrics):
-        row = {'step': step, **metrics}
-        self.writer.writerow(row)
-        self.file.flush()
-        metrics = ', '.join([f"{k}: {v}" for k, v in metrics.items()]) # log to stdout:
-        print(f"step: {step}; {metrics}")
-
-
-def evaluate(model, test_dataloader, n_steps):
-    was_train = model.train
-    model.eval()
-
-    correct, total = 0, 0
-    loss = 0.0
-    with torch.no_grad():
-        s = 0
-        for X, y in test_dataloader:
-            if s >= n_steps:
-                break
-            y_hat = model(X)
-
-            loss += F.cross_entropy(y_hat, y)
-            y_pred = torch.argmax(y_hat, dim=-1)
-            correct += (y_pred == y).sum()
-            total += y_pred.shape[0]
-            s += 1
-    stats = {
-        f"accuracy": correct.item() / total,
-        f"loss": loss.item() / n_steps,
-    }
-
-    if was_train:
-        model.train()
-    return stats
+torch.set_default_dtype(torch.float64)
 
 
 def train(
-        model_config, optimizer_config,
-        batch_size, 
-        n_train_steps, n_eval_steps,
-        eval_freq, log_freq,
-        seed=0,
-        run_dir="./runs", data_dir="./data",
-    ):
+    model_config, optimizer_config, parametrization_config, lr_scheduler_config, data_config,
+    n_train_steps,
+    log_freq=1,
+    seed=0,
+    run_dir="./runs",
+    metrics_config=None,
+):
     torch.manual_seed(seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    worker_id = int(os.environ.get("WORKER_ID", 0))
-    device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
-
-    logger = CSVLogger(fieldnames=["step", "train_loss", "train_acc", "val_loss", "val_acc"], log_dir=run_dir, overwrite=False)
-
-    train_loader = CIFAR10Dataset(batch_size=batch_size, train=True, device=device, root=data_dir)
-    test_loader = CIFAR10Dataset(batch_size=batch_size, train=False, device=device, root=data_dir)
-
-    model = model_config().build()
-    model = model.to(device)
-
+    # --- Build model/optimizer/params
+    model = model_config().build().to(device)
     opt_cfg = optimizer_config()
-    # params = standard_parametrization(model, lr_prefactor=opt_cfg['lr'], std_prefactor=1.0)
-    params = mu_parametrization(model, lr_prefactor=opt_cfg['lr'], std_prefactor=1.0)
+
+    width = model_config()["dims"][1]  # fan-in width for parametrization
+    params = parametrization_config().build(mlp=model, n=width, lr_prefactor=opt_cfg['lr'], std_prefactor=1.0)
     opt = opt_cfg.build(params=params)
 
+    lr_scheduler = lr_scheduler_config().build(optimizer=opt)
+    alignment_warmup = 100
+
+    # --- Data
+    train_loader = data_config().build(device=device)
+
+    # --- Tracer
+    tracer = Tracer(model, sample_size=32)
+    measurement_X, _ = next(iter(train_loader))
+    tracer.capture_initial(measurement_X)
+
+    # --- Metrics
+    metrics_spec = metrics_config().build() if metrics_config is not None else ["alignment", "rL"]
+    metric_set = build_metric_set(metrics_spec)
+
+    # --- Logger schema
+    current0 = tracer.capture(step=0, measurement_X=measurement_X)
+    window0 = tracer.window(current0)
+    base_schema = {"losses": (1,), "lrs": (window0.n_layers,)}
+    extra_schema = schema_from_metrics(metric_set, window0) if metric_set else {}
+    schema = {**base_schema, **extra_schema}
+    logger = BinaryLogger(run_dir, n_steps=n_train_steps, metrics=schema)
+
+    # --- Train loop
     s = 0
+    diverged = False
     for X, y in train_loader:
-        if s >= n_train_steps:
+        if s >= n_train_steps or diverged:
             break
+
         opt.zero_grad()
         y_hat = model(X)
 
-        loss = F.cross_entropy(y_hat, y)
+        if train_loader.type == "classification":
+            loss = F.cross_entropy(y_hat, y)
+        elif train_loader.type == "regression":
+            loss = F.mse_loss(y_hat, y)
+        loss_item = float(loss.item())
+
+        if not np.isfinite(loss_item):
+            diverged = True
+            for m_name in logger.metrics:
+                logger.metrics[m_name][s:] = np.inf
+            print("Exiting early due to divergence...")
+            break
+
+        metric_row = {"step": s, "losses": loss_item}
+
+        # Compute metrics BEFORE backward/step
         if s % log_freq == 0:
-            print(f"step {s}; loss = {loss.item()}")
+            with torch.no_grad():
+                current = tracer.capture(step=s, measurement_X=measurement_X)
+                window = tracer.window(current)
 
+                if metric_set:
+                    mvals = compute_all(metric_set, window)
+                    metric_row.update(mvals)
+                else:
+                    mvals = {}
+
+                # LR scheduling using alignment if present
+                lrs = [0.0] * window.n_layers
+                if "Als" in mvals:
+                    Al = mvals["Als"]  # [L, 4]
+                    alpha_l = Al[:, 1].tolist()
+                    omega_l = Al[:, 2].tolist()
+                    u_l     = Al[:, 3].tolist()
+                else:
+                    alpha_l = omega_l = u_l = None
+
+                if s > alignment_warmup:
+                    try:
+                        lrs = lr_scheduler(alpha_l=alpha_l, u_l=u_l, omega_l=omega_l)
+                    except TypeError:
+                        lrs = [0.0] * window.n_layers
+
+                metric_row["lrs"] = lrs
+
+            logger.log(metric_row)
+
+        # Backprop + step
         loss.backward()
+        tracer.collect_weight_grads_after_backward()  # grad_weight captured for next measurement
         opt.step()
+        tracer.on_optimizer_step()                    # update_weight captured for next measurement
 
-        if s % eval_freq == 0:
-            stats_train = evaluate(model, train_loader, n_steps=n_eval_steps)
-            stats_val = evaluate(model, test_loader, n_steps=n_eval_steps)
-            logger.log(step=s, train_loss=stats_train["loss"], train_acc=stats_train["accuracy"], val_loss=stats_val["loss"], val_acc=stats_val["accuracy"])
         s += 1
 
-    stats_train = evaluate(model, train_loader, n_steps=n_eval_steps)
-    stats_val = evaluate(model, test_loader, n_steps=n_eval_steps)
-    logger.log(step=s, train_loss=stats_train["loss"], train_acc=stats_train["accuracy"], val_loss=stats_val["loss"], val_acc=stats_val["accuracy"])
+    logger.save()
 
 
-def main(run_name, model_config, optimizer_config, training_config):
-    run_dir = os.path.join("./runs", run_name)
+def main(run_name, exp_name, training_config, model_config, optimizer_config, lr_scheduler_config, parametrization_config, data_config, metrics_config=None):
+    run_dir = os.path.join("./runs", exp_name, run_name)
     os.makedirs(run_dir, exist_ok=True)
+
+    # Save configs (metrics saved like the rest)
     configs = {
         "training": training_config,
         "model": model_config,
-        "optimizer": optimizer_config
+        "optimizer": optimizer_config,
+        "lr_scheduler": lr_scheduler_config,
+        "parametrization": parametrization_config,
+        "data": data_config,
     }
+    if metrics_config is not None:
+        configs["metrics"] = metrics_config
+
     for config_name, config in configs.items():
         config_path = os.path.join(run_dir, f"{config_name}_config.json")
         with open(config_path, "w") as f:
             json.dump(config().get_params(), f, indent=4)
 
+    # Kick off training via the training config
     training_config().build(
-        model_config=model_config, 
+        model_config=model_config,
         optimizer_config=optimizer_config,
-        run_dir=os.path.join("./runs", run_name),
+        lr_scheduler_config=lr_scheduler_config,
+        parametrization_config=parametrization_config,
+        data_config=data_config,
+        metrics_config=metrics_config,
+        run_dir=run_dir,
     )
 
 
@@ -131,28 +162,13 @@ if __name__ == "__main__":
     worker_id = int(os.environ.get("WORKER_ID", 0))
     n_workers = int(os.environ.get("N_WORKERS", 1))
 
-    widths = [256, 512, 1024, 2048]
-    lrs = np.power(10, np.linspace(-2.0, -1.0, num=16)).tolist()
-    N_REPETITIONS = 4  # for confidence intervals
+    import configs.lib
+    exp_name = sys.argv[1]
+    grid = getattr(configs.lib, exp_name)
 
-    for w_id, w in enumerate(widths):
-        for lr_id, lr in enumerate(lrs):
-            exp_id = w_id * len(lrs) + lr_id
-            if exp_id % n_workers == worker_id:
-                def mlp_w():
-                    model_config = mlp_base()
-                    model_config["dims"][1] = w
-                    model_config["dims"][2] = w
-                    return model_config
-                def sgd_lr():
-                    opt_config = sgd_base()
-                    opt_config["lr"] = lr
-                    return opt_config
-
-                for r in range(N_REPETITIONS):  # overwrite=False in CSVLogger so timestamp included
-                    def seeded_training_base():
-                        training_config = training_base()
-                        training_config["seed"] = training_config["seed"] + r
-                        return training_config
-
-                    main(f"mlp_3layer_hiddenw_{w}_lr_{lr}", mlp_w, sgd_lr, seeded_training_base)
+    for run_id, run_name, param_args in grid():
+        if run_id % n_workers == worker_id:
+            t0 = time.time()
+            main(run_name, exp_name, *param_args)
+            tf = time.time()
+            print(f"Experiment {run_name} (id={run_id}) completed in {tf - t0:.2f} seconds by worker {worker_id}.")
