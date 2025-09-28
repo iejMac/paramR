@@ -213,6 +213,14 @@ def cifar10_data(batch_size=256, **noise_kwargs):
     from data import CIFAR10Dataset
     return Config(obj=CIFAR10Dataset, params={"batch_size": batch_size, **noise_kwargs})
 
+def cifar10_nclass_data(n_classes: int, batch_size=256, **noise_kwargs):
+    """
+    CIFAR10 classification restricted to the first n_classes in sorted order.
+    noise_kwargs: signal_fn, signal_strength, signal_range, signal_period, total_steps
+    """
+    from data import CIFAR10FewClassDataset
+    return Config(obj=CIFAR10FewClassDataset, params={"batch_size": batch_size, "n_classes": n_classes, **noise_kwargs})
+
 
 # ----------------------------
 # Single experiment grid: width × LR, with a single selected dataset
@@ -250,8 +258,7 @@ def width_lr_grid(
         base_out_dim = CIFAR_NUM_CLASSES
 
         def data_cfg_factory(_dims):
-            # return cifar10_data(batch_size=256, signal_fn="const", signal_strength=1.0, signal_period=1000, total_steps=1000)
-            return cifar10_data(batch_size=256, signal_fn="const", signal_strength=0.6, signal_period=1000, total_steps=1000)
+            return cifar10_data(batch_size=256, signal_fn="const", signal_strength=1.0, signal_period=1000, total_steps=1000)
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -304,6 +311,50 @@ def width_lr_grid_cifar(**kwargs):
 
 def cifar_single(**kwargs):
     return width_lr_grid(widths=(512,), lrs=(2e-1,), optimizer="sgd", dataset="cifar")
-def cifar_single_more_noise(**kwargs):
-    return width_lr_grid(widths=(512,), lrs=(2e-1,), optimizer="sgd", dataset="cifar")
 
+
+def cifar_nclass_sweep(n_classes_list=(2, 5, 8, 10), width=512, lr=2e-1, optimizer="sgd"):
+    """
+    Sweep over number of CIFAR classes with a fixed width/lr.
+    Yields (run_id, run_name, param_args) for main().
+    """
+    base_in_dim = CIFAR_IN_DIM
+
+    run_id = 0
+    for n_cls in n_classes_list:
+        out_dim = n_cls
+        dims = [base_in_dim, width, width, out_dim]
+
+        def model_cfg(dims=dims):
+            return mlp_2h_with_dims(dims[0], dims[1], dims[3])
+
+        def data_cfg(n_cls=n_cls):
+            return cifar10_nclass_data(
+                n_classes=n_cls,
+                batch_size=256,
+                signal_fn="const",
+                signal_strength=1.0,
+                signal_period=1000,
+                total_steps=1000,
+            )
+
+        def opt_cfg(lr=lr, which=optimizer):
+            return sgd(lr) if which == "sgd" else adamw(lr)
+
+        def param_cfg(n_layers=DEPTH_LAYERS):
+            return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
+
+        def lr_sched_cfg():
+            return const_lr_scheduler()
+
+        def training_cfg():
+            # Keep logging every 10 steps by default
+            return training_small(n_steps=1000, seed=0, log_freq=10)
+
+        def metrics_cfg():
+            return metrics_alignment_and_rL()
+
+        run_name = f"cifar_ncls{n_cls}_w{width}_lr{lr:.3g}_{optimizer}"
+        param_args = (training_cfg, model_cfg, opt_cfg, lr_sched_cfg, param_cfg, data_cfg, metrics_cfg)
+        yield run_id, run_name, param_args
+        run_id += 1

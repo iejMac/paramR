@@ -61,6 +61,7 @@ def train(
     s = 0
     diverged = False
     for X, y in train_loader:
+        print(s)
         if s >= n_train_steps or diverged:
             break
 
@@ -168,6 +169,7 @@ if __name__ == "__main__":
 
     for run_id, run_name, param_args in grid():
         if run_id % n_workers == worker_id:
+            print(f"Starting {run_name} (id={run_id}) on worker {worker_id}...")
             t0 = time.time()
             main(run_name, exp_name, *param_args)
             tf = time.time()
