@@ -149,7 +149,7 @@ def adamw(lr: float):
     return Config(obj=AdamW, params={"lr": lr})
 
 
-def const_lr_scheduler():
+def const_lr_scheduler(*args, **kwargs):
     from parametrization import constant_lr_scheduler
     return Config(obj=constant_lr_scheduler, params={})
 
@@ -229,6 +229,7 @@ def depth_width_lr_grid(
     lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
     optimizer="sgd",                 # "sgd" or "adamw"
     dataset="synth",                 # "synth" or "cifar"
+    lr_scheduler=const_lr_scheduler  # "const_lr_scheduler" or "max_lr_scheduler"
 ):
     """
     Yields (run_id, run_name, param_args) for main().
@@ -286,7 +287,10 @@ def depth_width_lr_grid(
 
                 # LR scheduler
                 def lr_sched_cfg():
-                    return const_lr_scheduler()
+                    param = param_cfg()
+                    al = param['al']
+                    bl = param['bl']
+                    return lr_scheduler(n=w, al=al, bl=bl, lr_prefactor=lr)
 
                 # Training & Metrics
                 def training_cfg():
@@ -318,7 +322,17 @@ def cifar_baseline_grid(**kwargs):
         depths=(3, 4, 5),
         widths=(128, 256, 512),
         lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
-        optimizer="sgd"
+        optimizer="sgd",
+        lr_scheduler=const_lr_scheduler
+    )
+
+def cifar_maxlr_grid(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(3, 4, 5),
+        widths=(128, 256, 512),
+        lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
+        optimizer="sgd",
+        lr_scheduler=max_lr_scheduler
     )
 
 

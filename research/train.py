@@ -7,6 +7,7 @@ import time
 import numpy as np
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 
 from logger import BinaryLogger
 from metrics.tracing import Tracer
@@ -60,8 +61,7 @@ def train(
     # --- Train loop
     s = 0
     diverged = False
-    for X, y in train_loader:
-        print(s)
+    for X, y in tqdm(train_loader, total=n_train_steps, desc="Training"):
         if s >= n_train_steps or diverged:
             break
 
