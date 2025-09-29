@@ -13,19 +13,9 @@ CIFAR_NUM_CLASSES = 10
 DEPTH_LAYERS = 3  # in -> hid1 -> hid2 -> out
 
 
-def mlp_2h_with_dims(in_dim: int, width: int, out_dim: int):
+def mlp_with_dims(dims: list[int]):
     from model import MLP
-    dims = [in_dim, width, width, out_dim]
     return Config(obj=MLP, params={"dims": dims, "bias": False})
-
-
-# def mup_parametrization(n_layers: int = DEPTH_LAYERS):
-#     from parametrization import abc_parametrization
-#     # simple muP-like exponents
-#     al = [-0.5] + [0.0] * (n_layers - 2) + [0.5]
-#     bl = [0.5]  + [0.5] * (n_layers - 2) + [0.5]
-#     cl = [0.0]  + [0.0] * (n_layers - 2) + [0.0]
-#     return Config(obj=abc_parametrization, params={"al": al, "bl": bl, "cl": cl})
 
 
 def mup_parametrization(opt, alignment, n_layers):
@@ -164,6 +154,14 @@ def const_lr_scheduler():
     return Config(obj=constant_lr_scheduler, params={})
 
 
+def max_lr_scheduler(n, al, bl, lr_prefactor, feature_learning=False):
+    from parametrization import maximal_lr_scheduler
+    return Config(
+        obj=maximal_lr_scheduler,
+        params={"n": n, "al": al, "bl": bl, "lr_prefactor": lr_prefactor, "feature_learning": feature_learning}
+    )
+
+
 def training_small(n_steps: int = 1000, seed: int = 0, log_freq: int = 1):
     from train import train
     return Config(obj=train, params={"seed": seed, "n_train_steps": n_steps, "log_freq": log_freq})
@@ -225,7 +223,8 @@ def cifar10_nclass_data(n_classes: int, batch_size=256, **noise_kwargs):
 # ----------------------------
 # Single experiment grid: width × LR, with a single selected dataset
 # ----------------------------
-def width_lr_grid(
+def depth_width_lr_grid(
+    depths=(3, 4),
     widths=(32, 64, 128),
     lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
     optimizer="sgd",                 # "sgd" or "adamw"
@@ -263,54 +262,64 @@ def width_lr_grid(
         raise ValueError(f"Unknown dataset: {dataset}")
 
     run_id = 0
-    for w in widths:
-        for lr in lrs:
-            dims = [base_in_dim, w, w, base_out_dim]
 
-            # Model & Data (bound to dims)
-            def model_cfg(dims=dims):
-                return mlp_2h_with_dims(dims[0], dims[1], dims[3])
+    for d in depths:
+        for w in widths:
+            for lr in lrs:
+                dims = [base_in_dim] + (d - 1) * [w] + [base_out_dim]
 
-            def data_cfg(dims=dims):
-                return data_cfg_factory(dims)
+                # Model & Data (bound to dims)
+                def model_cfg(dims=dims):
+                    return mlp_with_dims(dims)
 
-            # Optimizer bound to LR
-            def opt_cfg(lr=lr, which=optimizer):
-                return sgd(lr) if which == "sgd" else adamw(lr)
+                def data_cfg(dims=dims):
+                    return data_cfg_factory(dims)
 
-            # Parametrization sized to depth
-            def param_cfg(n_layers=DEPTH_LAYERS):
-                # return standard_parametrization("sgd", alignment="full", n_layers=n_layers)
-                return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
+                # Optimizer bound to LR
+                def opt_cfg(lr=lr, which=optimizer):
+                    return sgd(lr) if which == "sgd" else adamw(lr)
 
-            # LR scheduler
-            def lr_sched_cfg():
-                return const_lr_scheduler()
+                # Parametrization sized to depth
+                def param_cfg(n_layers=d):
+                    # return standard_parametrization("sgd", alignment="full", n_layers=n_layers)
+                    return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
 
-            # Training & Metrics
-            def training_cfg():
-                return training_small(n_steps=1000, seed=0, log_freq=10)
+                # LR scheduler
+                def lr_sched_cfg():
+                    return const_lr_scheduler()
 
-            def metrics_cfg():
-                # return metrics_none()
-                return metrics_alignment_and_rL()
+                # Training & Metrics
+                def training_cfg():
+                    return training_small(n_steps=1000, seed=0, log_freq=10)
 
-            run_name = f"{ds_tag}_w{w}_lr{lr:.3g}_{optimizer}"
-            param_args = (training_cfg, model_cfg, opt_cfg, lr_sched_cfg, param_cfg, data_cfg, metrics_cfg)
+                def metrics_cfg():
+                    # return metrics_none()
+                    return metrics_alignment_and_rL()
 
-            yield run_id, run_name, param_args
-            run_id += 1
+                run_name = f"{ds_tag}_d{d}_w{w}_lr{lr:.3g}_{optimizer}"
+                param_args = (training_cfg, model_cfg, opt_cfg, lr_sched_cfg, param_cfg, data_cfg, metrics_cfg)
+
+                yield run_id, run_name, param_args
+                run_id += 1
 
 
 # Convenience aliases (useful with your launcher)
-def width_lr_grid_synth(**kwargs):
-    return width_lr_grid(dataset="synth", **kwargs)
+def depth_width_lr_grid_synth(**kwargs):
+    return depth_width_lr_grid(dataset="synth", **kwargs)
 
-def width_lr_grid_cifar(**kwargs):
-    return width_lr_grid(dataset="cifar", **kwargs)
+def depth_width_lr_grid_cifar(**kwargs):
+    return depth_width_lr_grid(dataset="cifar", **kwargs)
 
 def cifar_single(**kwargs):
-    return width_lr_grid(widths=(512,), lrs=(2e-1,), optimizer="sgd", dataset="cifar")
+    return depth_width_lr_grid(widths=(512,), lrs=(2e-1,), optimizer="sgd", dataset="cifar")
+
+def cifar_baseline_grid(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(3, 4, 5),
+        widths=(128, 256, 512),
+        lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
+        optimizer="sgd"
+    )
 
 
 def cifar_nclass_sweep(n_classes_list=(2, 5, 8, 10), width=512, lr=2e-1, optimizer="sgd"):
@@ -326,7 +335,7 @@ def cifar_nclass_sweep(n_classes_list=(2, 5, 8, 10), width=512, lr=2e-1, optimiz
         dims = [base_in_dim, width, width, out_dim]
 
         def model_cfg(dims=dims):
-            return mlp_2h_with_dims(dims[0], dims[1], dims[3])
+            return mlp_with_dims(dims)
 
         def data_cfg(n_cls=n_cls):
             return cifar10_nclass_data(
