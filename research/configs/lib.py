@@ -300,7 +300,7 @@ def depth_width_lr_grid(
                     # return metrics_none()
                     return metrics_alignment_and_rL()
 
-                run_name = f"{ds_tag}_d{d}_w{w}_lr{lr:.3g}_{optimizer}"
+                run_name = f"{ds_tag}_{lr_scheduler.__name__}_d{d}_w{w}_lr{lr:.3g}_{optimizer}"
                 param_args = (training_cfg, model_cfg, opt_cfg, lr_sched_cfg, param_cfg, data_cfg, metrics_cfg)
 
                 yield run_id, run_name, param_args
