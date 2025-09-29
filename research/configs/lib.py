@@ -219,7 +219,6 @@ def cifar10_nclass_data(n_classes: int, batch_size=256, **noise_kwargs):
     from data import CIFAR10FewClassDataset
     return Config(obj=CIFAR10FewClassDataset, params={"batch_size": batch_size, "n_classes": n_classes, **noise_kwargs})
 
-
 # ----------------------------
 # Single experiment grid: width × LR, with a single selected dataset
 # ----------------------------
@@ -263,7 +262,6 @@ def depth_width_lr_grid(
         raise ValueError(f"Unknown dataset: {dataset}")
 
     run_id = 0
-
     for d in depths:
         for w in widths:
             for lr in lrs:
