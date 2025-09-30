@@ -363,7 +363,7 @@ def cifar_nclass_sweep(n_classes_list=(2, 5, 8, 10), width=512, lr=2e-1, optimiz
             return sgd(lr) if which == "sgd" else adamw(lr)
 
         def param_cfg(n_layers=DEPTH_LAYERS):
-            return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
+            return mup_parametrization(optimizer, alignment="full", n_layers=n_layers)
 
         def lr_sched_cfg():
             return const_lr_scheduler()
