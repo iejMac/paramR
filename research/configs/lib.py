@@ -280,8 +280,8 @@ def depth_width_lr_grid(
 
                 # Parametrization sized to depth
                 def param_cfg(n_layers=d):
-                    # return standard_parametrization("sgd", alignment="full", n_layers=n_layers)
-                    return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
+                    # return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
+                    return standard_parametrization(optimizer, alignment="full", n_layers=n_layers)
 
                 # LR scheduler
                 def lr_sched_cfg():
@@ -320,7 +320,7 @@ def cifar_baseline_grid(**kwargs):
         depths=(3, 4, 5),
         widths=(128, 256, 512),
         lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
-        optimizer="sgd",
+        optimizer="adam",
         lr_scheduler=const_lr_scheduler
     )
 
@@ -329,7 +329,7 @@ def cifar_maxlr_grid(**kwargs):
         depths=(3, 4, 5),
         widths=(128, 256, 512),
         lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
-        optimizer="sgd",
+        optimizer="adam",
         lr_scheduler=max_lr_scheduler
     )
 

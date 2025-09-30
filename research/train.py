@@ -13,7 +13,17 @@ from logger import BinaryLogger
 from metrics.tracing import Tracer
 from metrics.lib import build_metric_set, schema_from_metrics, compute_all
 
-torch.set_default_dtype(torch.float64)
+# Prevent CPU thread oversubscription when many workers run concurrently.
+# Honor env overrides; default to 1 thread per op and interop.
+try:
+    _tn = int(os.environ.get("TORCH_NUM_THREADS", "1"))
+    _itn = int(os.environ.get("TORCH_INTEROP_THREADS", "1"))
+    if _tn > 0:
+        torch.set_num_threads(_tn)
+    if _itn > 0 and hasattr(torch, "set_num_interop_threads"):
+        torch.set_num_interop_threads(_itn)
+except Exception:
+    pass
 
 
 def train(
