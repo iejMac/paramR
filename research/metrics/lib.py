@@ -118,22 +118,6 @@ def _resample_w0(shape: Tuple[int, ...], al: float, bl: float, std_prefactor: fl
     std = std_prefactor * (var_l ** 0.5)
     return torch.randn(shape, dtype=torch.float64) * std
 
-
-def _compute_z0_from_w0(z_prev: torch.Tensor, w0_new: torch.Tensor, al: float, apply_relu: bool = True) -> torch.Tensor:
-    """
-    Compute z0 for a layer given the previous layer's z0 and a resampled w0.
-    z_prev: input to this layer (batch_size, in_features)
-    w0_new: resampled initial weight (out_features, in_features)
-    al: parametrization exponent for layer multiplier
-    apply_relu: whether to apply ReLU activation (False for last layer)
-    """
-    n = w0_new.shape[1]  # fan-in
-    layer_mult = n ** (-al)
-    z0 = z_prev @ w0_new.T * layer_mult
-    if apply_relu:
-        z0 = torch.relu(z0)
-    return z0
-
 # ---------- rL (feature learning) ----------
 
 @register
@@ -188,57 +172,24 @@ class Alignment(Metric):
         L = window.n_layers
         res = torch.zeros((L, 4), dtype=torch.float64)
 
-        # Prepare w0 and z0 for all layers
-        w0_dict = {}
-        z0_dict = {}
-
-        if self.resample_w0 and window.init_params is not None:
-            al_list = window.init_params.get('al', [])
-            bl_list = window.init_params.get('bl', [])
-
-            # First pass: resample all w0s
-            for idx, lname in enumerate(window.layer_names):
-                init = window.init.layers[lname]
-                w0_stored = init.weight
-
-                if idx < len(al_list) and idx < len(bl_list):
-                    al, bl = al_list[idx], bl_list[idx]
-                    # Resample w0 with same dtype as stored weights
-                    w0_dict[lname] = _resample_w0(w0_stored.shape, al=al, bl=bl).to(w0_stored.dtype)
-                else:
-                    w0_dict[lname] = w0_stored
-
-            # Second pass: compute z0s via forward pass
-            for idx, lname in enumerate(window.layer_names):
-                init = window.init.layers[lname]
-                z0_input = init.input  # Input to this layer at initialization
-
-                if idx == 0:
-                    # First layer: use the original input (doesn't change)
-                    z0_dict[lname] = z0_input
-                else:
-                    # Compute z0 for this layer from previous layer's output
-                    prev_lname = window.layer_names[idx - 1]
-                    z0_prev = z0_dict[prev_lname]  # Input to this layer (output of prev)
-                    w0_prev = w0_dict[prev_lname]
-                    al_prev = al_list[idx - 1] if idx - 1 < len(al_list) else 0.0
-
-                    # Compute output of previous layer with resampled w0_prev
-                    apply_relu = (idx < L)  # All layers except last have ReLU
-                    z0_dict[lname] = _compute_z0_from_w0(z0_prev, w0_prev, al_prev, apply_relu=apply_relu)
-        else:
-            # Use stored values
-            for lname in window.layer_names:
-                init = window.init.layers[lname]
-                w0_dict[lname] = init.weight
-                z0_dict[lname] = init.input
-
-        # Main computation loop
         for idx, lname in enumerate(window.layer_names):
             cur = window.current.layers[lname]
+            init = window.init.layers[lname]
+
             z, w, o = cur.input, cur.weight, cur.output
-            w0 = w0_dict[lname]
-            z0 = z0_dict[lname]
+            z0 = init.input
+
+            # Use resampled w0 if enabled, otherwise use stored w0
+            if self.resample_w0 and window.init_params is not None:
+                al_list = window.init_params.get('al', [])
+                bl_list = window.init_params.get('bl', [])
+                if idx < len(al_list) and idx < len(bl_list):
+                    al, bl = al_list[idx], bl_list[idx]
+                    w0 = _resample_w0(init.weight.shape, al=al, bl=bl).to(init.weight.dtype)
+                else:
+                    w0 = init.weight
+            else:
+                w0 = init.weight
 
             assert z is not None and w is not None and o is not None
             assert z0 is not None and w0 is not None

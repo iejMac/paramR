@@ -333,7 +333,7 @@ def cifar_maxlr_grid(**kwargs):
         lr_scheduler=max_lr_scheduler
     )
 
-def cifar_maxlr_resamplew0_grid(**kwargs):
+def cifar_maxlr_resamplew0_keepz0_grid(**kwargs):
     return depth_width_lr_grid_cifar(
         depths=(3, 4, 5),
         widths=(128, 256, 512),
