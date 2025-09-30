@@ -167,8 +167,8 @@ def training_small(n_steps: int = 1000, seed: int = 0, log_freq: int = 1):
     return Config(obj=train, params={"seed": seed, "n_train_steps": n_steps, "log_freq": log_freq})
 
 
-def metrics_alignment_and_rL():
-    return Config(obj=lambda spec: spec, params={"spec": ["alignment", "rL"]})
+def metrics_alignment_and_rL(resample_w0=False):
+    return Config(obj=lambda spec, resample_w0: (spec, resample_w0), params={"spec": ["alignment", "rL"], "resample_w0": resample_w0})
 
 def metrics_none():
     return Config(obj=lambda spec: spec, params={"spec": []})
@@ -296,7 +296,7 @@ def depth_width_lr_grid(
 
                 def metrics_cfg():
                     # return metrics_none()
-                    return metrics_alignment_and_rL()
+                    return metrics_alignment_and_rL(resample_w0=True)
 
                 run_name = f"{ds_tag}_{lr_scheduler.__name__}_d{d}_w{w}_lr{lr:.3g}_{optimizer}"
                 param_args = (training_cfg, model_cfg, opt_cfg, lr_sched_cfg, param_cfg, data_cfg, metrics_cfg)
@@ -333,6 +333,14 @@ def cifar_maxlr_grid(**kwargs):
         lr_scheduler=max_lr_scheduler
     )
 
+def cifar_maxlr_resamplew0_grid(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(3, 4, 5),
+        widths=(128, 256, 512),
+        lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
+        optimizer="adam",
+        lr_scheduler=max_lr_scheduler
+    )
 
 def cifar_nclass_sweep(n_classes_list=(2, 5, 8, 10), width=512, lr=2e-1, optimizer="sgd"):
     """

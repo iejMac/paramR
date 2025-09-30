@@ -28,6 +28,8 @@ class TraceWindow:
     n_layers: int
     width_fan_in: int
     layer_names: List[str]
+    # Initialization parameters (a, b from abc parametrization)
+    init_params: Optional[Dict[str, List[float]]] = None
 
 class Tracer:
     """
@@ -36,9 +38,10 @@ class Tracer:
               grad_weight (after backward) +
               update_weight (after optimizer.step()).
     """
-    def __init__(self, model: nn.Module, sample_size: int = 32):
+    def __init__(self, model: nn.Module, sample_size: int = 32, init_params: Optional[Dict[str, List[float]]] = None):
         self.model = model
         self.sample_size = sample_size
+        self.init_params = init_params  # Store al, bl for resampling
 
         # collect linear modules in definition order
         self.layer_names: List[str] = []
@@ -138,4 +141,5 @@ class Tracer:
             n_layers=len(self.layer_names),
             width_fan_in=width,
             layer_names=self.layer_names,
+            init_params=self.init_params,
         )

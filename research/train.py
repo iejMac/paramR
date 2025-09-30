@@ -42,7 +42,8 @@ def train(
     opt_cfg = optimizer_config()
 
     width = model_config()["dims"][1]  # fan-in width for parametrization
-    params = parametrization_config().build(mlp=model, n=width, lr_prefactor=opt_cfg['lr'], std_prefactor=1.0)
+    param_cfg = parametrization_config()
+    params = param_cfg.build(mlp=model, n=width, lr_prefactor=opt_cfg['lr'], std_prefactor=1.0)
     opt = opt_cfg.build(params=params)
 
     lr_scheduler = lr_scheduler_config().build(optimizer=opt)
@@ -51,14 +52,27 @@ def train(
     # --- Data
     train_loader = data_config().build(device=device)
 
-    # --- Tracer
-    tracer = Tracer(model, sample_size=32)
+    # --- Tracer (pass init params for potential resampling)
+    init_params = {'al': param_cfg['al'], 'bl': param_cfg['bl']}
+    tracer = Tracer(model, sample_size=32, init_params=init_params)
     measurement_X, _ = next(iter(train_loader))
     tracer.capture_initial(measurement_X)
 
     # --- Metrics
-    metrics_spec = metrics_config().build() if metrics_config is not None else ["alignment", "rL"]
-    metric_set = build_metric_set(metrics_spec)
+    if metrics_config is not None:
+        metrics_result = metrics_config().build()
+        # Handle both old format (just spec) and new format (spec, resample_w0)
+        if isinstance(metrics_result, tuple):
+            metrics_spec, resample_w0 = metrics_result
+        else:
+            metrics_spec = metrics_result
+            resample_w0 = False
+    else:
+        metrics_spec = ["alignment", "rL"]
+        resample_w0 = False
+
+    # Build metrics with resample_w0 config
+    metric_set = build_metric_set(metrics_spec, resample_w0=resample_w0) if metrics_spec else None
 
     # --- Logger schema
     current0 = tracer.capture(step=0, measurement_X=measurement_X)

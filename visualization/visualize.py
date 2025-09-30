@@ -567,6 +567,11 @@ def main():
     example_exp_collector = RunCollector(example_exp)
     exps["max"] = example_exp_collector
 
+    example_exp = "/home/maciej/code/align/paramR/runs/cifar_maxlr_resamplew0_grid"
+    example_exp_collector = RunCollector(example_exp)
+    exps["max (resampled w0z0)"] = example_exp_collector
+
+
     # Load and group runs
     def group_by_architecture(run: RunData) -> Dict[str, Any]:
         dims = run.model_config["params"]["dims"]
