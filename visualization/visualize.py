@@ -603,6 +603,8 @@ def main():
         "Loss Comparison",
         smoothing_alpha=0.1,
     )
+    for ax in fig1.axes:
+        ax.set_ylim(0.0, 3.0)
     fig1.savefig(f"./figs/{prefix}losses.png", bbox_inches='tight', dpi=300)
 
     # Plot losses (automatically handles multiple runs)

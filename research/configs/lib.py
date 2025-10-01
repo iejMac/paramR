@@ -292,7 +292,7 @@ def depth_width_lr_grid(
 
                 # Training & Metrics
                 def training_cfg():
-                    return training_small(n_steps=1000, seed=0, log_freq=10)
+                    return training_small(n_steps=1000, seed=0, log_freq=1)
 
                 def metrics_cfg():
                     # return metrics_none()
@@ -378,7 +378,7 @@ def cifar_nclass_sweep(n_classes_list=(2, 5, 8, 10), width=512, lr=2e-1, optimiz
 
         def training_cfg():
             # Keep logging every 10 steps by default
-            return training_small(n_steps=1000, seed=0, log_freq=10)
+            return training_small(n_steps=1000, seed=0, log_freq=1)
 
         def metrics_cfg():
             return metrics_alignment_and_rL()
