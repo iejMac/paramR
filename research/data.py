@@ -1,3 +1,5 @@
+import numpy as np
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -58,6 +60,72 @@ class CIFAR10Dataset(NoisyDataset):
             signal = self.signal_fn(self.step)
             self.step += 1
             # Blend the original data with noise based on the signal.
+            X = X * signal + noise * (1 - signal)
+
+            yield X, y
+
+
+class CIFAR10FewClassDataset(NoisyDataset):
+    def __init__(
+            self, batch_size, n_classes=10, train=True, device="cpu", root="./data",
+            signal_fn='const', signal_strength=1.0, signal_range=1.0, signal_period=1000, total_steps=1000,
+            classes=None,
+    ):
+        """
+        CIFAR10 dataset with a configurable number of classes.
+        By default selects the first n_classes in sorted order deterministically.
+
+        Args:
+            batch_size: Batch size for the iterator
+            n_classes: Number of classes to include (defaults to 10)
+            classes: Optional alias for n_classes if passed in configs as 'classes'
+            train, device, root: Standard dataset args
+            signal_*: Noise blending parameters (see NoisyDataset)
+        """
+        # Alias support: allow 'classes' to specify the count
+        if classes is not None and n_classes == 10:  # use explicit classes if provided
+            n_classes = int(classes)
+
+        super().__init__(device, signal_fn, signal_strength, signal_range, signal_period, total_steps)
+        self.batch_size = batch_size
+        self.device = device
+        self.type = "classification"
+
+        # Load full CIFAR-10
+        transform = transforms.Normalize(CIFAR_MEAN, CIFAR_STD)
+        dataset = torchvision.datasets.CIFAR10(root=root, train=train, download=True)
+
+        # Determine which labels to keep deterministically
+        targets_np = np.array(dataset.targets)
+        unique_labels = sorted(set(int(t) for t in targets_np.tolist()))
+        keep_labels = unique_labels[:int(n_classes)]
+
+        # Mask and filter
+        mask = np.isin(targets_np, keep_labels)
+        data_filtered = dataset.data[mask]
+        targets_filtered = targets_np[mask]
+
+        # Remap labels to [0..n_classes-1] deterministically
+        label_map = {lbl: i for i, lbl in enumerate(keep_labels)}
+        targets_mapped = np.vectorize(label_map.get)(targets_filtered)
+
+        # Tensorize and normalize/flatten
+        X = (torch.tensor(data_filtered).float() / 255).permute(0, 3, 1, 2)
+        X = transform(X).view(X.shape[0], -1).to(device)
+        Y = torch.tensor(targets_mapped, dtype=torch.long).to(device)
+
+        self.X = X
+        self.Y = Y
+
+    def __iter__(self):
+        while True:
+            idx = torch.randint(0, self.X.shape[0], (self.batch_size,))
+            X = self.X[idx]
+            y = self.Y[idx]
+
+            noise = torch.randn(X.shape).to(self.device)
+            signal = self.signal_fn(self.step)
+            self.step += 1
             X = X * signal + noise * (1 - signal)
 
             yield X, y

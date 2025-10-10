@@ -559,13 +559,13 @@ def main():
 
     exps = {}
 
-    example_exp = "/home/maciej/code/align/paramR/runs/cifar_single"
+    example_exp = "/home/maciej/code/align/paramR/runs/cifar_baseline_grid"
     example_exp_collector = RunCollector(example_exp)
-    exps["example"] = example_exp_collector
+    exps["baseline"] = example_exp_collector
 
-    example_exp = "/home/maciej/code/align/paramR/runs/cifar_single_more_noise"
+    example_exp = "/home/maciej/code/align/paramR/runs/cifar_maxlr_grid"
     example_exp_collector = RunCollector(example_exp)
-    exps["example_more_noise"] = example_exp_collector
+    exps["max"] = example_exp_collector
 
     # Load and group runs
     def group_by_architecture(run: RunData) -> Dict[str, Any]:
@@ -610,7 +610,7 @@ def main():
         combined_groups, 
         "lrs", 
         "Learning Rate Schedules",
-        subsample_config={"layers": [0, 3, 6, 8]},
+        # subsample_config={"layers": [0, 3, 6, 8]},
     )
     for ax in fig2.axes:
         ax.set_yscale('log')
@@ -623,7 +623,8 @@ def main():
             combined_groups, 
             "Als", 
             "Alignment Analysis", 
-            subsample_config={"metrics": [al_idx], "layers": [0, 1, 2]},
+            # subsample_config={"metrics": [al_idx], "layers": [0, 1, 2]},
+            subsample_config={"metrics": [al_idx]},
             smoothing_alpha=0.1,
         )
         # for ax in fig3.axes:
