@@ -567,6 +567,14 @@ def main():
     example_exp_collector = RunCollector(example_exp)
     exps["max"] = example_exp_collector
 
+    example_exp = "/home/maciej/code/align/paramR/runs/cifar_maxlr_resamplew0_grid"
+    example_exp_collector = RunCollector(example_exp)
+    exps["max (resampled w0z0)"] = example_exp_collector
+
+    example_exp = "/home/maciej/code/align/paramR/runs/cifar_maxlr_resamplew0_keepz0_grid"
+    example_exp_collector = RunCollector(example_exp)
+    exps["max (resampled w0)"] = example_exp_collector
+
     # Load and group runs
     def group_by_architecture(run: RunData) -> Dict[str, Any]:
         dims = run.model_config["params"]["dims"]
@@ -595,6 +603,8 @@ def main():
         "Loss Comparison",
         smoothing_alpha=0.1,
     )
+    for ax in fig1.axes:
+        ax.set_ylim(0.0, 3.0)
     fig1.savefig(f"./figs/{prefix}losses.png", bbox_inches='tight', dpi=300)
 
     # Plot losses (automatically handles multiple runs)
