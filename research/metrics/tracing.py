@@ -46,19 +46,19 @@ class Tracer:
         # collect linear modules in definition order
         self.layer_names: List[str] = []
         self.modules: List[nn.Linear] = []
-        for _, m in model.named_modules():
-            if isinstance(m, nn.Linear):
-                self.layer_names.append(f"lin_{len(self.modules)}")
-                self.modules.append(m)
 
-        # (optional) align with model.n_layers if present
-        n_layers = getattr(model, "n_layers", None)
-        if isinstance(n_layers, int) and n_layers > 0:
-            self.layer_names = self.layer_names[:n_layers]
-            self.modules     = self.modules[:n_layers]
+        def traverse_model(m: nn.Module, prefix: str):
+            for name, layer in m.named_children():
+                if isinstance(layer, nn.Linear):  # TODO: add embedding and layer norm?
+                    self.layer_names.append(f"{prefix}.{name}")
+                    self.modules.append(layer)
+                else:
+                    traverse_model(layer, f"{prefix}.{name}")
+
+        traverse_model(self.model, prefix="model")
 
         if not self.modules:
-            raise RuntimeError("Tracer: no nn.Linear layers found.")
+            raise RuntimeError("Tracer: no layers found.")
 
         self._armed = False
         self._snap: Dict[str, LayerSnap] = {}

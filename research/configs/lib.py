@@ -18,6 +18,21 @@ def mlp_with_dims(dims: list[int]):
     return Config(obj=MLP, params={"dims": dims, "bias": False})
 
 
+def cifar_vit(dim, n_layers):
+    from model import ViT
+    return Config(
+        obj=ViT,
+        params={
+            "image_size": 32,
+            "patch_size": 4,
+            "dim": dim,
+            "hidden_dim": 4 * dim,
+            "n_layers": n_layers,
+            "n_classes": 10
+        }
+    )
+
+
 def mup_parametrization(opt, alignment, n_layers):
     from parametrization import abc_parametrization
 
@@ -265,13 +280,13 @@ def depth_width_lr_grid(
     for d in depths:
         for w in widths:
             for lr in lrs:
-                dims = [base_in_dim] + (d - 1) * [w] + [base_out_dim]
-
                 # Model & Data (bound to dims)
-                def model_cfg(dims=dims):
-                    return mlp_with_dims(dims)
+                def model_cfg(dim=w, n_layers=d):
+                    return cifar_vit(dim, n_layers)
 
-                def data_cfg(dims=dims):
+                def data_cfg(dims=None):
+                    if dims is None:
+                        dims = [base_in_dim] + (d - 1) * [w] + [base_out_dim]
                     return data_cfg_factory(dims)
 
                 # Optimizer bound to LR
@@ -279,7 +294,7 @@ def depth_width_lr_grid(
                     return sgd(lr) if which == "sgd" else adamw(lr)
 
                 # Parametrization sized to depth
-                def param_cfg(n_layers=d):
+                def param_cfg(n_layers=3):
                     # return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
                     return standard_parametrization(optimizer, alignment="full", n_layers=n_layers)
 
