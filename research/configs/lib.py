@@ -339,6 +339,15 @@ def cifar_baseline_grid(**kwargs):
         lr_scheduler=const_lr_scheduler
     )
 
+def cifar_vit_baseline_grid(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(4, 6, 8),
+        widths=(128, 256, 512),
+        lrs=(1e-1, 6e-2, 5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3),
+        optimizer="adam",
+        lr_scheduler=const_lr_scheduler
+    )
+
 def cifar_maxlr_grid(**kwargs):
     return depth_width_lr_grid_cifar(
         depths=(3, 4, 5),
