@@ -9,6 +9,7 @@ from .config import Config
 SYNTH_IN_DIM = 32                 # SyntheticNormalDataset feature dim
 CIFAR_IN_DIM = 32 * 32 * 3        # 3072 flattened CIFAR10
 CIFAR_NUM_CLASSES = 10
+N_STEPS = 10000
 
 DEPTH_LAYERS = 3  # in -> hid1 -> hid2 -> out
 
@@ -177,7 +178,7 @@ def max_lr_scheduler(n, al, bl, lr_prefactor, feature_learning=False):
     )
 
 
-def training_small(n_steps: int = 1000, seed: int = 0, log_freq: int = 1):
+def training_small(n_steps: int = N_STEPS, seed: int = 0, log_freq: int = 1):
     from train import train
     return Config(obj=train, params={"seed": seed, "n_train_steps": n_steps, "log_freq": log_freq})
 
@@ -272,7 +273,7 @@ def depth_width_lr_grid(
         base_out_dim = CIFAR_NUM_CLASSES
 
         def data_cfg_factory(_dims):
-            return cifar10_data(batch_size=256, signal_fn="const", signal_strength=1.0, signal_period=1000, total_steps=1000)
+            return cifar10_data(batch_size=256, signal_fn="const", signal_strength=1.0, signal_period=N_STEPS, total_steps=N_STEPS)
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -307,7 +308,7 @@ def depth_width_lr_grid(
 
                 # Training & Metrics
                 def training_cfg():
-                    return training_small(n_steps=1000, seed=0, log_freq=1)
+                    return training_small(n_steps=N_STEPS, seed=0, log_freq=1)
 
                 def metrics_cfg():
                     # return metrics_none()
@@ -344,6 +345,15 @@ def cifar_vit_baseline_grid(**kwargs):
         depths=(4, 6, 8),
         widths=(128, 256, 512),
         lrs=(1e-1, 6e-2, 5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3),
+        optimizer="adam",
+        lr_scheduler=const_lr_scheduler
+    )
+
+def cifar_test_vit(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(8,),
+        widths=(1024,),
+        lrs=(5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3, 4e-3, 1e-3, 6e-4, 4e-4, 1e-4),
         optimizer="adam",
         lr_scheduler=const_lr_scheduler
     )
@@ -387,8 +397,8 @@ def cifar_nclass_sweep(n_classes_list=(2, 5, 8, 10), width=512, lr=2e-1, optimiz
                 batch_size=256,
                 signal_fn="const",
                 signal_strength=1.0,
-                signal_period=1000,
-                total_steps=1000,
+                signal_period=N_STEPS,
+                total_steps=N_STEPS,
             )
 
         def opt_cfg(lr=lr, which=optimizer):
@@ -402,7 +412,7 @@ def cifar_nclass_sweep(n_classes_list=(2, 5, 8, 10), width=512, lr=2e-1, optimiz
 
         def training_cfg():
             # Keep logging every 10 steps by default
-            return training_small(n_steps=1000, seed=0, log_freq=1)
+            return training_small(n_steps=N_STEPS, seed=0, log_freq=1)
 
         def metrics_cfg():
             return metrics_alignment_and_rL()
