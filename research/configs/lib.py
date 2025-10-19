@@ -352,7 +352,7 @@ def cifar_vit_baseline_grid(**kwargs):
 def cifar_test_vit(**kwargs):
     return depth_width_lr_grid_cifar(
         depths=(8,),
-        widths=(1024,),
+        widths=(512,),
         lrs=(5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3, 4e-3, 1e-3, 6e-4, 4e-4, 1e-4),
         optimizer="adam",
         lr_scheduler=const_lr_scheduler
