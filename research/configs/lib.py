@@ -297,7 +297,7 @@ def depth_width_lr_grid(
                 # Parametrization sized to depth
                 def param_cfg(n_layers=3):
                     # return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
-                    return standard_parametrization(optimizer, alignment="full", n_layers=n_layers)
+                    return mup_parametrization(optimizer, alignment="full", n_layers=n_layers)
 
                 # LR scheduler
                 def lr_sched_cfg():
