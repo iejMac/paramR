@@ -9,7 +9,7 @@ from .config import Config
 SYNTH_IN_DIM = 32                 # SyntheticNormalDataset feature dim
 CIFAR_IN_DIM = 32 * 32 * 3        # 3072 flattened CIFAR10
 CIFAR_NUM_CLASSES = 10
-N_STEPS = 10000
+N_STEPS = 2500
 
 DEPTH_LAYERS = 3  # in -> hid1 -> hid2 -> out
 
@@ -244,7 +244,8 @@ def depth_width_lr_grid(
     lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
     optimizer="sgd",                 # "sgd" or "adamw"
     dataset="synth",                 # "synth" or "cifar"
-    lr_scheduler=const_lr_scheduler  # "const_lr_scheduler" or "max_lr_scheduler"
+    lr_scheduler=const_lr_scheduler, # "const_lr_scheduler" or "max_lr_scheduler"
+    resample_w0=False                # True to resample w0 when using max_lr_scheduler
 ):
     """
     Yields (run_id, run_name, param_args) for main().
@@ -281,6 +282,8 @@ def depth_width_lr_grid(
     for d in depths:
         for w in widths:
             for lr in lrs:
+                n = 2 * d + 2 # for ViT: 2 params per FF layer + one embed + one readout
+
                 # Model & Data (bound to dims)
                 def model_cfg(dim=w, n_layers=d):
                     return cifar_vit(dim, n_layers)
@@ -295,7 +298,7 @@ def depth_width_lr_grid(
                     return sgd(lr) if which == "sgd" else adamw(lr)
 
                 # Parametrization sized to depth
-                def param_cfg(n_layers=3):
+                def param_cfg(n_layers=n):
                     # return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
                     return mup_parametrization(optimizer, alignment="full", n_layers=n_layers)
 
@@ -304,7 +307,7 @@ def depth_width_lr_grid(
                     param = param_cfg()
                     al = param['al']
                     bl = param['bl']
-                    return lr_scheduler(n=w, al=al, bl=bl, lr_prefactor=lr)
+                    return lr_scheduler(n=n, al=al, bl=bl, lr_prefactor=lr)
 
                 # Training & Metrics
                 def training_cfg():
@@ -312,7 +315,7 @@ def depth_width_lr_grid(
 
                 def metrics_cfg():
                     # return metrics_none()
-                    return metrics_alignment_and_rL(resample_w0=True)
+                    return metrics_alignment_and_rL(resample_w0=resample_w0)
 
                 run_name = f"{ds_tag}_{lr_scheduler.__name__}_d{d}_w{w}_lr{lr:.3g}_{optimizer}"
                 param_args = (training_cfg, model_cfg, opt_cfg, lr_sched_cfg, param_cfg, data_cfg, metrics_cfg)
@@ -347,6 +350,26 @@ def cifar_vit_baseline_grid(**kwargs):
         lrs=(1e-1, 6e-2, 5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3),
         optimizer="adam",
         lr_scheduler=const_lr_scheduler
+    )
+
+def cifar_vit_maxlr_grid(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(4, 6, 8),
+        widths=(128, 256, 512),
+        lrs=(1e-1, 6e-2, 5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3),
+        optimizer="adam",
+        lr_scheduler=max_lr_scheduler,
+        resample_w0=False
+    )
+
+def cifar_vit_maxlr_resample_grid(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(4, 6, 8),
+        widths=(128, 256, 512),
+        lrs=(1e-1, 6e-2, 5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3),
+        optimizer="adam",
+        lr_scheduler=max_lr_scheduler,
+        resample_w0=True
     )
 
 def cifar_test_vit(**kwargs):

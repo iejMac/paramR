@@ -555,25 +555,21 @@ class GridVisualizer:
 
 def main():
     # Collect runs from both experiments
-    prefix = "example_spec_"
+    prefix = "cifar_vit_"
 
     exps = {}
     
     BASE_PATH = os.path.dirname(os.path.dirname(__file__))
 
-    example_exp = f"{BASE_PATH}/runs/cifar_baseline_grid"
+    example_exp = f"{BASE_PATH}/runs/cifar_vit_baseline_grid"
     example_exp_collector = RunCollector(example_exp)
     exps["baseline"] = example_exp_collector
 
-    example_exp = f"{BASE_PATH}/runs/cifar_maxlr_grid"
+    example_exp = f"{BASE_PATH}/runs/cifar_vit_maxlr_grid"
     example_exp_collector = RunCollector(example_exp)
     exps["max"] = example_exp_collector
 
-    example_exp = f"{BASE_PATH}/runs/cifar_maxlr_resamplew0_grid"
-    example_exp_collector = RunCollector(example_exp)
-    exps["max (resampled w0z0)"] = example_exp_collector
-
-    example_exp = f"{BASE_PATH}/runs/cifar_maxlr_resamplew0_keepz0_grid"
+    example_exp = f"{BASE_PATH}/runs/cifar_vit_maxlr_resample_grid"
     example_exp_collector = RunCollector(example_exp)
     exps["max (resampled w0)"] = example_exp_collector
 

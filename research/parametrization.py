@@ -11,9 +11,9 @@ def abc_parametrization(model, al, bl, cl, lr_prefactor, std_prefactor):
 
     embed_a, embed_b, embed_c = al[0], bl[0], cl[0]
     hidden_a, hidden_b, hidden_c = al[1], bl[1], cl[1]
-    readout_a, readout_b, readout_c = al[2], bl[2], cl[2]
+    readout_a, readout_b, readout_c = al[-1], bl[-1], cl[-1]
 
-    def setup_parametrization(layer, a, b, c):
+    def setup_parametrization(name, layer, a, b, c):
         if isinstance(layer, LayerNorm):
             weight = layer.ln.weight
             n = 1 # TODO: check if this is correct?
@@ -34,24 +34,25 @@ def abc_parametrization(model, al, bl, cl, lr_prefactor, std_prefactor):
         if isinstance(layer, Embedding) and b == 0:  # special case from Everett et al.
             std = 0.01
 
-        if isinstance(layer, MLPLayer):  # TODO: add embedding and layer norm?
+        if isinstance(layer, MLPLayer) and 'attn' not in name.lower():
             lr_scale_groups.append((lr_scale, weight))
 
         layer.layer_multiplier = l_mult
         torch.nn.init.normal_(weight, mean=0.0, std=std)
 
-    def traverse_model(module):
+    def traverse_model(module, prefix):
         for name, layer in module.named_children():
+            name = f"{prefix}.{name}"
             if 'embed' in name or isinstance(layer, Embedding) or isinstance(layer, LayerNorm):
-                setup_parametrization(layer, a=embed_a, b=embed_b, c=embed_c)
+                setup_parametrization(name, layer, a=embed_a, b=embed_b, c=embed_c)
             elif 'readout' in name:
-                setup_parametrization(layer, a=readout_a, b=readout_b, c=readout_c)
+                setup_parametrization(name, layer, a=readout_a, b=readout_b, c=readout_c)
             elif isinstance(layer, MLPLayer):
-                setup_parametrization(layer, a=hidden_a, b=hidden_b, c=hidden_c)
+                setup_parametrization(name, layer, a=hidden_a, b=hidden_b, c=hidden_c)
             else:
-                traverse_model(layer)
+                traverse_model(layer, name)
 
-    traverse_model(model)
+    traverse_model(model, prefix="model")
     optim_groups = [{'params': params, 'lr': lr_prefactor * lr_scale} for lr_scale, params in lr_scale_groups]
     return optim_groups
 

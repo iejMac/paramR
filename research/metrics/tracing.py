@@ -49,6 +49,8 @@ class Tracer:
 
         def traverse_model(m: nn.Module, prefix: str):
             for name, layer in m.named_children():
+                if 'attn' in name.lower():
+                    continue  # skip attention layers
                 if isinstance(layer, nn.Linear):  # TODO: add embedding and layer norm?
                     self.layer_names.append(f"{prefix}.{name}")
                     self.modules.append(layer)
