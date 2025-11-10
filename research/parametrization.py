@@ -4,18 +4,55 @@ from solver import find_c_adam, find_c_sgd
 
 
 # new group for each param (so dynamic setting is easier)
-def abc_parametrization(mlp, n, al, bl, cl, lr_prefactor=0.1, std_prefactor=2**0.5):
+def abc_parametrization(model, al, bl, cl, lr_prefactor, std_prefactor):
+    from model import Embedding, LayerNorm, MLPLayer
+
     lr_scale_groups = []
-    for i, layer in enumerate(mlp.layers):
-        a, b, c = al[i], bl[i], cl[i]
+
+    embed_a, embed_b, embed_c = al[0], bl[0], cl[0]
+    hidden_a, hidden_b, hidden_c = al[1], bl[1], cl[1]
+    readout_a, readout_b, readout_c = al[-1], bl[-1], cl[-1]
+
+    def setup_parametrization(name, layer, a, b, c):
+        if isinstance(layer, LayerNorm):
+            weight = layer.ln.weight
+            n = 1 # TODO: check if this is correct?
+        elif isinstance(layer, Embedding):
+            weight = layer.params
+            n = weight.size(1)
+        elif isinstance(layer, MLPLayer):
+            weight = layer.lin.weight
+            n = weight.size(1)
+        else:
+            raise ValueError()
 
         l_mult = n ** -a
         var_l = n ** (-2*b)
+        std=std_prefactor * (var_l ** 0.5)
         lr_scale = n ** -c
 
-        lr_scale_groups.append((lr_scale, layer.lin.weight))
-        mlp.layers[i].layer_multiplier = l_mult
-        torch.nn.init.normal_(layer.lin.weight, mean=0.0, std=std_prefactor * (var_l ** 0.5))
+        if isinstance(layer, Embedding) and b == 0:  # special case from Everett et al.
+            std = 0.01
+
+        if isinstance(layer, MLPLayer) and 'attn' not in name.lower():
+            lr_scale_groups.append((lr_scale, weight))
+
+        layer.layer_multiplier = l_mult
+        torch.nn.init.normal_(weight, mean=0.0, std=std)
+
+    def traverse_model(module, prefix):
+        for name, layer in module.named_children():
+            name = f"{prefix}.{name}"
+            if 'embed' in name or isinstance(layer, Embedding) or isinstance(layer, LayerNorm):
+                setup_parametrization(name, layer, a=embed_a, b=embed_b, c=embed_c)
+            elif 'readout' in name:
+                setup_parametrization(name, layer, a=readout_a, b=readout_b, c=readout_c)
+            elif isinstance(layer, MLPLayer):
+                setup_parametrization(name, layer, a=hidden_a, b=hidden_b, c=hidden_c)
+            else:
+                traverse_model(layer, name)
+
+    traverse_model(model, prefix="model")
     optim_groups = [{'params': params, 'lr': lr_prefactor * lr_scale} for lr_scale, params in lr_scale_groups]
     return optim_groups
 

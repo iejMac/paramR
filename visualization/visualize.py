@@ -555,32 +555,29 @@ class GridVisualizer:
 
 def main():
     # Collect runs from both experiments
-    prefix = "example_spec_"
+    prefix = "cifar_vit_"
 
     exps = {}
+    
+    BASE_PATH = os.path.dirname(os.path.dirname(__file__))
 
-    example_exp = "/home/maciej/code/align/paramR/runs/cifar_baseline_grid"
+    example_exp = f"{BASE_PATH}/runs/cifar_vit_baseline_grid"
     example_exp_collector = RunCollector(example_exp)
     exps["baseline"] = example_exp_collector
 
-    example_exp = "/home/maciej/code/align/paramR/runs/cifar_maxlr_grid"
+    example_exp = f"{BASE_PATH}/runs/cifar_vit_maxlr_grid"
     example_exp_collector = RunCollector(example_exp)
     exps["max"] = example_exp_collector
 
-    example_exp = "/home/maciej/code/align/paramR/runs/cifar_maxlr_resamplew0_grid"
-    example_exp_collector = RunCollector(example_exp)
-    exps["max (resampled w0z0)"] = example_exp_collector
-
-    example_exp = "/home/maciej/code/align/paramR/runs/cifar_maxlr_resamplew0_keepz0_grid"
+    example_exp = f"{BASE_PATH}/runs/cifar_vit_maxlr_resample_grid"
     example_exp_collector = RunCollector(example_exp)
     exps["max (resampled w0)"] = example_exp_collector
 
     # Load and group runs
     def group_by_architecture(run: RunData) -> Dict[str, Any]:
-        dims = run.model_config["params"]["dims"]
         return {
-            "depth": len(dims) - 1,
-            "width": dims[1]
+            "depth": run.model_config["params"]["n_layers"],
+            "width": run.model_config["params"]["dim"]
         }
 
     for exp_name, exp in exps.items():
@@ -605,7 +602,7 @@ def main():
     )
     for ax in fig1.axes:
         ax.set_ylim(0.0, 3.0)
-    fig1.savefig(f"./figs/{prefix}losses.png", bbox_inches='tight', dpi=300)
+    fig1.savefig(f"{BASE_PATH}/figs/{prefix}losses.png", bbox_inches='tight', dpi=300)
 
     # Plot losses (automatically handles multiple runs)
     fig1 = viz.plot_grid(
@@ -613,7 +610,7 @@ def main():
         "rLs", 
         "Feature Learning Residuals",
     )
-    fig1.savefig(f"./figs/{prefix}rLs.png", bbox_inches='tight', dpi=300)
+    fig1.savefig(f"{BASE_PATH}/figs/{prefix}rLs.png", bbox_inches='tight', dpi=300)
 
     # Plot learning rates (automatically handles layers)
     fig2 = viz.plot_grid(
@@ -625,7 +622,7 @@ def main():
     for ax in fig2.axes:
         ax.set_yscale('log')
         ax.set_ylim(0, 1e1)
-    fig2.savefig(f"./figs/{prefix}learning_rates.png", bbox_inches='tight', dpi=300)
+    fig2.savefig(f"{BASE_PATH}/figs/{prefix}learning_rates.png", bbox_inches='tight', dpi=300)
     
     # Plot alignment (automatically handles layers and metrics)
     for al_idx in range(4):
@@ -640,7 +637,7 @@ def main():
         # for ax in fig3.axes:
         #     ax.set_ylim(0.3, 1.2)
         al_name = METRIC_CONFIGS['Als'].component_names[al_idx]
-        fig3.savefig(f"./figs/{prefix}alignment_{al_name}.png", bbox_inches='tight', dpi=300)
+        fig3.savefig(f"{BASE_PATH}/figs/{prefix}alignment_{al_name}.png", bbox_inches='tight', dpi=300)
     
     plt.close('all')
 

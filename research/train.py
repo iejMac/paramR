@@ -41,9 +41,8 @@ def train(
     model = model_config().build().to(device)
     opt_cfg = optimizer_config()
 
-    width = model_config()["dims"][1]  # fan-in width for parametrization
     param_cfg = parametrization_config()
-    params = param_cfg.build(mlp=model, n=width, lr_prefactor=opt_cfg['lr'], std_prefactor=1.0)
+    params = param_cfg.build(model=model, lr_prefactor=opt_cfg['lr'], std_prefactor=1.0)
     opt = opt_cfg.build(params=params)
 
     lr_scheduler = lr_scheduler_config().build(optimizer=opt)

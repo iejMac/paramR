@@ -34,7 +34,7 @@ class NoisyDataset:
 
 class CIFAR10Dataset(NoisyDataset):
     def __init__(
-            self, batch_size, train=True, device="cpu", root="./data",
+            self, batch_size, train=True, device="cpu", root="./data", flatten=False,
             signal_fn='const', signal_strength=1.0, signal_range=1.0, signal_period=1000, total_steps=1000
     ):
         # Pass the new parameter signal_range to the parent class.
@@ -46,7 +46,9 @@ class CIFAR10Dataset(NoisyDataset):
         self.transform = transforms.Normalize(CIFAR_MEAN, CIFAR_STD)
         dataset = torchvision.datasets.CIFAR10(root=root, train=train, download=True)
         self.X = (torch.tensor(dataset.data).float() / 255).permute(0, 3, 1, 2)
-        self.X = self.transform(self.X).view(self.X.shape[0], -1).to(device)
+        self.X = self.transform(self.X).to(device)
+        if flatten:
+            self.X = self.X.view(self.X.shape[0], -1)
         self.Y = torch.tensor(dataset.targets).to(device)
 
     def __iter__(self):
@@ -67,7 +69,7 @@ class CIFAR10Dataset(NoisyDataset):
 
 class CIFAR10FewClassDataset(NoisyDataset):
     def __init__(
-            self, batch_size, n_classes=10, train=True, device="cpu", root="./data",
+            self, batch_size, n_classes=10, train=True, device="cpu", root="./data", flatten=False,
             signal_fn='const', signal_strength=1.0, signal_range=1.0, signal_period=1000, total_steps=1000,
             classes=None,
     ):
@@ -111,7 +113,9 @@ class CIFAR10FewClassDataset(NoisyDataset):
 
         # Tensorize and normalize/flatten
         X = (torch.tensor(data_filtered).float() / 255).permute(0, 3, 1, 2)
-        X = transform(X).view(X.shape[0], -1).to(device)
+        X = transform(X).to(device)
+        if flatten:
+            X = X.view(X.shape[0], -1)
         Y = torch.tensor(targets_mapped, dtype=torch.long).to(device)
 
         self.X = X

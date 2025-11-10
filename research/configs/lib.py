@@ -9,6 +9,7 @@ from .config import Config
 SYNTH_IN_DIM = 32                 # SyntheticNormalDataset feature dim
 CIFAR_IN_DIM = 32 * 32 * 3        # 3072 flattened CIFAR10
 CIFAR_NUM_CLASSES = 10
+N_STEPS = 2500
 
 DEPTH_LAYERS = 3  # in -> hid1 -> hid2 -> out
 
@@ -16,6 +17,21 @@ DEPTH_LAYERS = 3  # in -> hid1 -> hid2 -> out
 def mlp_with_dims(dims: list[int]):
     from model import MLP
     return Config(obj=MLP, params={"dims": dims, "bias": False})
+
+
+def cifar_vit(dim, n_layers):
+    from model import ViT
+    return Config(
+        obj=ViT,
+        params={
+            "image_size": 32,
+            "patch_size": 4,
+            "dim": dim,
+            "hidden_dim": 4 * dim,
+            "n_layers": n_layers,
+            "n_classes": 10
+        }
+    )
 
 
 def mup_parametrization(opt, alignment, n_layers):
@@ -162,7 +178,7 @@ def max_lr_scheduler(n, al, bl, lr_prefactor, feature_learning=False):
     )
 
 
-def training_small(n_steps: int = 1000, seed: int = 0, log_freq: int = 1):
+def training_small(n_steps: int = N_STEPS, seed: int = 0, log_freq: int = 1):
     from train import train
     return Config(obj=train, params={"seed": seed, "n_train_steps": n_steps, "log_freq": log_freq})
 
@@ -228,7 +244,8 @@ def depth_width_lr_grid(
     lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
     optimizer="sgd",                 # "sgd" or "adamw"
     dataset="synth",                 # "synth" or "cifar"
-    lr_scheduler=const_lr_scheduler  # "const_lr_scheduler" or "max_lr_scheduler"
+    lr_scheduler=const_lr_scheduler, # "const_lr_scheduler" or "max_lr_scheduler"
+    resample_w0=False                # True to resample w0 when using max_lr_scheduler
 ):
     """
     Yields (run_id, run_name, param_args) for main().
@@ -257,7 +274,7 @@ def depth_width_lr_grid(
         base_out_dim = CIFAR_NUM_CLASSES
 
         def data_cfg_factory(_dims):
-            return cifar10_data(batch_size=256, signal_fn="const", signal_strength=1.0, signal_period=1000, total_steps=1000)
+            return cifar10_data(batch_size=256, signal_fn="const", signal_strength=1.0, signal_period=N_STEPS, total_steps=N_STEPS)
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -265,13 +282,15 @@ def depth_width_lr_grid(
     for d in depths:
         for w in widths:
             for lr in lrs:
-                dims = [base_in_dim] + (d - 1) * [w] + [base_out_dim]
+                n = 2 * d + 2 # for ViT: 2 params per FF layer + one embed + one readout
 
                 # Model & Data (bound to dims)
-                def model_cfg(dims=dims):
-                    return mlp_with_dims(dims)
+                def model_cfg(dim=w, n_layers=d):
+                    return cifar_vit(dim, n_layers)
 
-                def data_cfg(dims=dims):
+                def data_cfg(dims=None):
+                    if dims is None:
+                        dims = [base_in_dim] + (d - 1) * [w] + [base_out_dim]
                     return data_cfg_factory(dims)
 
                 # Optimizer bound to LR
@@ -279,24 +298,24 @@ def depth_width_lr_grid(
                     return sgd(lr) if which == "sgd" else adamw(lr)
 
                 # Parametrization sized to depth
-                def param_cfg(n_layers=d):
+                def param_cfg(n_layers=n):
                     # return mup_parametrization("sgd", alignment="full", n_layers=n_layers)
-                    return standard_parametrization(optimizer, alignment="full", n_layers=n_layers)
+                    return mup_parametrization(optimizer, alignment="full", n_layers=n_layers)
 
                 # LR scheduler
                 def lr_sched_cfg():
                     param = param_cfg()
                     al = param['al']
                     bl = param['bl']
-                    return lr_scheduler(n=w, al=al, bl=bl, lr_prefactor=lr)
+                    return lr_scheduler(n=n, al=al, bl=bl, lr_prefactor=lr)
 
                 # Training & Metrics
                 def training_cfg():
-                    return training_small(n_steps=1000, seed=0, log_freq=1)
+                    return training_small(n_steps=N_STEPS, seed=0, log_freq=1)
 
                 def metrics_cfg():
                     # return metrics_none()
-                    return metrics_alignment_and_rL(resample_w0=True)
+                    return metrics_alignment_and_rL(resample_w0=resample_w0)
 
                 run_name = f"{ds_tag}_{lr_scheduler.__name__}_d{d}_w{w}_lr{lr:.3g}_{optimizer}"
                 param_args = (training_cfg, model_cfg, opt_cfg, lr_sched_cfg, param_cfg, data_cfg, metrics_cfg)
@@ -320,6 +339,44 @@ def cifar_baseline_grid(**kwargs):
         depths=(3, 4, 5),
         widths=(128, 256, 512),
         lrs=(6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 8e-2, 6e-2),
+        optimizer="adam",
+        lr_scheduler=const_lr_scheduler
+    )
+
+def cifar_vit_baseline_grid(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(4, 6, 8),
+        widths=(128, 256, 512),
+        lrs=(1e-1, 6e-2, 5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3),
+        optimizer="adam",
+        lr_scheduler=const_lr_scheduler
+    )
+
+def cifar_vit_maxlr_grid(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(4, 6, 8),
+        widths=(128, 256, 512),
+        lrs=(1e-1, 6e-2, 5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3),
+        optimizer="adam",
+        lr_scheduler=max_lr_scheduler,
+        resample_w0=False
+    )
+
+def cifar_vit_maxlr_resample_grid(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(4, 6, 8),
+        widths=(128, 256, 512),
+        lrs=(1e-1, 6e-2, 5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3),
+        optimizer="adam",
+        lr_scheduler=max_lr_scheduler,
+        resample_w0=True
+    )
+
+def cifar_test_vit(**kwargs):
+    return depth_width_lr_grid_cifar(
+        depths=(8,),
+        widths=(512,),
+        lrs=(5e-2, 4e-2, 3e-2, 2e-2, 1e-2, 8e-3, 6e-3, 4e-3, 1e-3, 6e-4, 4e-4, 1e-4),
         optimizer="adam",
         lr_scheduler=const_lr_scheduler
     )
@@ -363,8 +420,8 @@ def cifar_nclass_sweep(n_classes_list=(2, 5, 8, 10), width=512, lr=2e-1, optimiz
                 batch_size=256,
                 signal_fn="const",
                 signal_strength=1.0,
-                signal_period=1000,
-                total_steps=1000,
+                signal_period=N_STEPS,
+                total_steps=N_STEPS,
             )
 
         def opt_cfg(lr=lr, which=optimizer):
@@ -378,7 +435,7 @@ def cifar_nclass_sweep(n_classes_list=(2, 5, 8, 10), width=512, lr=2e-1, optimiz
 
         def training_cfg():
             # Keep logging every 10 steps by default
-            return training_small(n_steps=1000, seed=0, log_freq=1)
+            return training_small(n_steps=N_STEPS, seed=0, log_freq=1)
 
         def metrics_cfg():
             return metrics_alignment_and_rL()
